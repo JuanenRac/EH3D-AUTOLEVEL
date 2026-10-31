@@ -1,0 +1,117 @@
+{
+  "repo": "EH3D-AUTOLEVEL",
+  "ecosystem": "eh3d",
+  "tagline": "A G-code program that follows the table.",
+  "description": "EH3D-AUTOLEVEL is a Rust library and command line that rewrite a G-code program with the height map of the table of EH3D-COMMON, so that the Z follows the surface. It has no window yet.",
+  "columns": [
+    "WHO USES IT",
+    "THIS REPOSITORY",
+    "WHAT IT DEPENDS ON"
+  ],
+  "nodes": [
+    {
+      "id": "person",
+      "column": 0,
+      "level": "external",
+      "title": "A person",
+      "lines": [
+        "has a program and a map of",
+        "the table"
+      ]
+    },
+    {
+      "id": "motion",
+      "column": 0,
+      "level": "config",
+      "title": "Machine control",
+      "lines": [
+        "planned: MOTIONCNC will",
+        "correct while it sends"
+      ]
+    },
+    {
+      "id": "gcode",
+      "column": 1,
+      "level": "tested",
+      "title": "gcode",
+      "lines": [
+        "cuts the moves in pieces and",
+        "corrects the Z of each"
+      ],
+      "code": [
+        "src/gcode.rs::pub fn correct"
+      ]
+    },
+    {
+      "id": "surface",
+      "column": 1,
+      "level": "tested",
+      "title": "surface",
+      "lines": [
+        "bilinear or bicubic height",
+        "between the measured points"
+      ],
+      "code": [
+        "src/surface.rs::pub fn bicubic"
+      ]
+    },
+    {
+      "id": "map",
+      "column": 2,
+      "level": "external",
+      "title": "eh3d-levelling",
+      "lines": [
+        "the grid, the readings and",
+        "the bilinear surface (COMMON)"
+      ],
+      "code": [
+        "Cargo.toml::eh3d-levelling"
+      ]
+    },
+    {
+      "id": "probe",
+      "column": 2,
+      "level": "external",
+      "title": "The probe",
+      "lines": [
+        "writes the map; here a",
+        "simulated table"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "person",
+      "to": "gcode",
+      "label": "apply",
+      "level": "tested"
+    },
+    {
+      "from": "motion",
+      "to": "gcode",
+      "label": "planned",
+      "level": "config"
+    },
+    {
+      "from": "gcode",
+      "to": "surface",
+      "level": "tested"
+    },
+    {
+      "from": "surface",
+      "to": "map",
+      "level": "tested"
+    },
+    {
+      "from": "gcode",
+      "to": "probe",
+      "level": "tested"
+    }
+  ],
+  "legend": {
+    "tested": "covered by tests on a computer (13 tests)",
+    "config": "planned, not used today",
+    "external": "a person, a file or another repository"
+  },
+  "footer": "Nothing here has corrected a real board yet."
+}

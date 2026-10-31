@@ -1,0 +1,9 @@
+(a track and a hole)
+G90 G21
+G0 Z2
+G0 X10 Y10
+G1 Z-0.1 F60
+G1 X190 Y10 F200
+G1 X190 Y140
+G0 Z2
+M2

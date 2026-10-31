@@ -1,0 +1,25 @@
+[package]
+name = "eh3d-autolevel"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.75"
+description = "Corrects the Z of a G-code program with the height map of the table: long moves are cut in pieces that follow the surface"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/JuanenRac/EH3D-AUTOLEVEL"
+readme = "README.md"
+
+[lib]
+name = "eh3d_autolevel"
+path = "src/lib.rs"
+
+[[bin]]
+name = "eh3d-autolevel"
+path = "src/main.rs"
+
+[dependencies]
+# the height map of the table (a path dependency on the sibling repository)
+eh3d-levelling = { path = "../EH3D-COMMON/crates/levelling" }
+
+[profile.release]
+opt-level = 3
+lto = true
