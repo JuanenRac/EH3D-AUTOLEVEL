@@ -102,6 +102,7 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
     }
     let at = |x: f64, y: f64, line: usize| {
         height(map, x, y, opts.method)
+            .filter(|h| h.is_finite())
             .ok_or_else(|| format!("line {line}: the map has no height at ({x:.3}, {y:.3})"))
     };
     let zero = at(opts.reference.0, opts.reference.1, 0)?;
@@ -115,17 +116,32 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
     let mut pos = (0.0, 0.0, 0.0);
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
+        // the '%' that some postprocessors put at the start and at the end of the program is not a word
+        if raw.trim() == "%" {
+            out.push_str(raw);
+            out.push('\n');
+            continue;
+        }
         let w = words(raw, n)?;
         let mut moves_here = false;
+        let mut dwell = false;
         for &(letter, value) in &w {
             match (letter, value) {
                 ('G', v)
                     if v == 90.0
                         || v == 21.0
                         || v == 17.0
+                        || v == 40.0
+                        || v == 49.0
+                        || v == 61.0
+                        || v == 64.0
+                        || v == 80.0
+                        || v == 94.0
                         || (54.0..=59.0).contains(&v)
                         || v == 90.1
                         || v == 91.1 => {}
+                // a dwell takes its time in P (or X on some controllers): the line is not a move
+                ('G', 4.0) => dwell = true,
                 ('G', 91.0) => {
                     return Err(format!(
                         "line {n}: relative distances (G91) are not supported"
@@ -138,9 +154,20 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 ))
                 }
                 ('G', v) if v == 0.0 || v == 1.0 => mode = Some(v as u32),
+                // every other code changes the origin, the offsets or the way the machine moves (G10, G28, G30, G38, G43, G53, G92...):
+                // turning it into a plain move would be wrong, and dropping it would change the program
+                ('G', v) => {
+                    return Err(format!(
+                        "line {n}: G{} is not supported (only G0, G1, G4, G17, G21, G40, G49, G54-G59, G61, G64, G80, G90, G90.1, G91.1 and G94 are)",
+                        fmt(v)
+                    ))
+                }
                 ('X' | 'Y' | 'Z', _) => moves_here = true,
                 _ => {}
             }
+        }
+        if dwell {
+            moves_here = false;
         }
         if !moves_here {
             out.push_str(raw);

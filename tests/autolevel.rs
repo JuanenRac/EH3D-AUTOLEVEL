@@ -252,3 +252,35 @@ fn the_bicubic_option_corrects_a_program() {
         "{out}"
     );
 }
+
+#[test]
+fn codes_that_move_the_origin_or_the_offsets_are_refused_and_never_become_moves() {
+    let tilted = tilted();
+    let o = Options::default();
+    for code in [
+        "G92 X0 Y0 Z0",
+        "G53 G0 Z-1",
+        "G28 X0 Y0",
+        "G30",
+        "G10 L20 P1 X0 Y0 Z0",
+        "G38.2 Z-5",
+        "G43 H1 Z5",
+    ] {
+        let program = format!("G90 G21\nG0 X1 Y1\n{code}\nG1 X5 Y5\n");
+        let err = correct(&program, &tilted, &o).unwrap_err();
+        assert!(
+            err.contains("line 3") && err.contains("not supported"),
+            "{code}: {err}"
+        );
+    }
+    // the codes that do not move anything keep going through, and a dwell is not a move
+    let (out, _) = correct("%\nG17 G21 G90 G94\nG4 P1\nG4 X2\n%\n", &tilted, &o).unwrap();
+    assert_eq!(out, "%\nG17 G21 G90 G94\nG4 P1\nG4 X2\n%\n");
+}
+
+#[test]
+fn a_map_without_a_usable_height_is_refused_instead_of_writing_nan() {
+    let flat_in_x = HeightMap::flat(Grid::new((0.0, 0.0, 0.0, 100.0), 3, 3), 0.0);
+    let err = correct("G90\nG0 X1 Y1 Z1\n", &flat_in_x, &Options::default()).unwrap_err();
+    assert!(err.contains("no height"), "{err}");
+}
