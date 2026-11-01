@@ -97,6 +97,19 @@
             "zh": "库和命令行的测试",
             "pt": "testes da biblioteca e da linha de comandos"
           }
+        },
+        {
+          "name": "strict.rs",
+          "desc": {
+            "en": "tests of the mark of a levelled program and of the strict command line",
+            "es": "pruebas de la marca de un programa nivelado y de la línea de comandos estricta",
+            "de": "Tests der Markierung eines nivellierten Programms und der strengen Kommandozeile",
+            "fr": "tests de la marque d'un programme nivelé et de la ligne de commande stricte",
+            "it": "test del contrassegno di un programma livellato e della riga di comando rigorosa",
+            "ja": "補正済みプログラムの印と厳密なコマンドラインのテスト",
+            "zh": "已调平程序的标记和严格命令行的测试",
+            "pt": "testes da marca de um programa nivelado e da linha de comandos estrita"
+          }
         }
       ]
     },

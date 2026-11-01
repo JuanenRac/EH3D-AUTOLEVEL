@@ -91,8 +91,42 @@ fn fmt(v: f64) -> String {
     }
 }
 
-/// Corrects `text` with `map`. The map must be complete.
+/// The start of the comment that marks a program as already levelled.
+pub const MARK: &str = "(eh3d-autolevel";
+
+/// The number of the line that carries the mark of a levelled program, when the text has one.
+pub fn levelled_line(text: &str) -> Option<usize> {
+    text.lines()
+        .position(|l| l.trim_start().starts_with(MARK))
+        .map(|i| i + 1)
+}
+
+/// The corrected program with a comment line that says it was levelled, with which map (a hash of its text), reference point, method and piece length. The comment goes first,
+/// or after the `%` that some postprocessors put at the start. A program with the mark is refused by `correct`, so a levelled program is never levelled twice.
+pub fn mark(program: &str, map: &HeightMap, opts: &Options) -> String {
+    let mut hash: u32 = 0x811c_9dc5;
+    for b in map.to_text().bytes() {
+        hash = (hash ^ u32::from(b)).wrapping_mul(0x0100_0193);
+    }
+    let line = format!(
+        "{MARK} {} map={hash:08x} ref={},{} {:?} seg={})\n",
+        env!("CARGO_PKG_VERSION"),
+        fmt(opts.reference.0),
+        fmt(opts.reference.1),
+        opts.method,
+        fmt(opts.max_segment_mm)
+    );
+    match program.strip_prefix("%\n") {
+        Some(rest) => format!("%\n{line}{rest}"),
+        None => format!("{line}{program}"),
+    }
+}
+
+/// Corrects `text` with `map`. The map must be complete. A program that already carries the mark of a levelled one is refused: its Z is already corrected.
 pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, Report), String> {
+    if let Some(n) = levelled_line(text) {
+        return Err(format!("line {n}: this program was already levelled by eh3d-autolevel; level the original program, not its output"));
+    }
     map.require_complete().map_err(|e| e.to_string())?;
     if !(opts.max_segment_mm.is_finite() && opts.max_segment_mm > 0.0) {
         return Err(format!(

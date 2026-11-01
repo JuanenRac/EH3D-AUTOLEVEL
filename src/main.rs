@@ -2,7 +2,7 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D). GPL-3.0-or-later.
 #![forbid(unsafe_code)]
 
-use eh3d_autolevel::gcode::{correct, Options};
+use eh3d_autolevel::gcode::{correct, mark, Options};
 use eh3d_autolevel::surface::Method;
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
 use std::env;
@@ -27,6 +27,18 @@ fn flag(args: &mut Vec<String>, name: &str) -> Result<Option<String>, String> {
         return Ok(Some(v));
     }
     Ok(None)
+}
+
+/// What is left of the arguments once the options and the wanted words are taken must be nothing more than `max` words: an option that is written wrong or an extra word is an
+/// error, not something to ignore (the program would then make its output with the defaults).
+fn finish(args: &[String], max: usize) -> Result<(), String> {
+    if let Some(o) = args.iter().find(|a| a.starts_with("--")) {
+        return Err(format!("{o}: unknown option (see help)"));
+    }
+    if args.len() > max {
+        return Err(format!("{}: unexpected argument (see help)", args[max]));
+    }
+    Ok(())
 }
 
 fn number(text: &str, what: &str) -> Result<f64, String> {
@@ -65,10 +77,12 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if args.len() < 3 {
                 return Err("apply needs a map, an input program and an output file".into());
             }
+            finish(&args, 3)?;
             let map = load_map(&args[0])?;
             let text = fs::read_to_string(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?;
             let (out, r) = correct(&text, &map, &opts)?;
-            fs::write(&args[2], out).map_err(|e| format!("{}: {e}", args[2]))?;
+            fs::write(&args[2], mark(&out, &map, &opts))
+                .map_err(|e| format!("{}: {e}", args[2]))?;
             println!(
                 "{} moves corrected, {} pieces added, Z shifted from {:+.4} to {:+.4} mm",
                 r.moves, r.pieces_added, r.shift_min, r.shift_max
@@ -76,6 +90,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             Ok(())
         }
         "info" => {
+            finish(&args, 1)?;
             let map = load_map(args.first().ok_or("info needs a map")?)?;
             println!("{} of {} points measured", map.measured(), map.grid.len());
             if let Some((lo, hi, spread)) = map.spread() {
@@ -90,6 +105,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if args.len() < 7 {
                 return Err("demo-map needs OUT X0 Y0 X1 Y1 COLS ROWS".into());
             }
+            finish(&args, 7)?;
             let n = |k: usize, w: &str| number(&args[k], w);
             let cols = args[5]
                 .parse::<usize>()

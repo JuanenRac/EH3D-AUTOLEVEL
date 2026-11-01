@@ -18,7 +18,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 13 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has no window yet, it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 18 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has no window yet, it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Version | `0.0.1` |
 | Maturity | Scaffolding |
-| Tests | 13 |
+| Tests | 18 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 13 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
+| Tests | 🟡 | 18 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
 | Window | 🔴 | Planned: the egui window common to the suite; today there is only the command line. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
@@ -58,6 +58,8 @@ Each line is one part of this repository and the light says how far it is today.
 * **The program** (`src/gcode.rs`): a cutting move (G1) is cut in pieces no longer than the chosen length and each piece gets the Z that the map gives for its end; a rapid move (G0) is corrected only when it has a Z word. The zero of the correction is a reference point, the one where the Z of the job was set.
 * **The surface** (`src/surface.rs`): bilinear (the one of the map in EH3D-COMMON) or bicubic (Catmull-Rom), which goes through every measured point and follows a curved table better; outside the grid the height of the nearest edge is used.
 * **What is refused** with the number of the line: relative distances (G91), inches (G20), arcs (G2, G3), a move before any G0 or G1, a number that is not a number, a coordinate beyond a million millimetres, a move that would make more than a hundred thousand pieces and a map with points that were not measured.
+* **Strict command line:** an option that is written wrong (`--powr`) or a word too many is an error that names it, not something to ignore; the program would otherwise make its output with the default values.
+* **Never levelled twice:** the corrected program starts with a comment line (`(eh3d-autolevel VERSION map=HASH ref=X,Y method seg=N)`) that says it was levelled and with which map; a program that carries it is refused with its line, because correcting it again would add the correction of the table twice.
 * **Codes that move the origin are refused:** G10, G28, G30, G38, G43, G53, G92 and any other G code that is not a plain move or a setting that leaves the position alone stop the program with the number of the line (they used to be turned into moves to Z0); a dwell (G4) and the `%` line of the start and the end of a program pass through, and a map that gives no finite height is refused instead of writing `Z NaN`.
 
 ## 🧩 Role in EH3D
@@ -102,7 +104,8 @@ EH3D-AUTOLEVEL/
 │   ├── main.rs                                  the command line
 │   └── surface.rs                               a part of the logic
 ├── tests/
-│   └── autolevel.rs                             tests of the library and the command line
+│   ├── autolevel.rs                             tests of the library and the command line
+│   └── strict.rs                                tests of the mark of a levelled program and of the strict command line
 ├── examples/
 │   ├── sample.nc                                a sample to try the program with
 │   └── table.txt                                a sample to try the program with
@@ -135,7 +138,7 @@ cargo run --release -- info examples/table.txt
 
 ## 🧪 Testing
 
-The suite has 13 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 18 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 
@@ -152,11 +155,20 @@ The version lives in `Cargo.toml` and in `eh3d.project.json`; each version has i
 
 ```text
 EH3D-AUTOLEVEL/
-├── crates/
-│   ├── eh3d-parser-gerber/                      Gerber RS-274X reader
-│   ├── eh3d-parser-excellon/                    Excellon drill file reader
-│   └── eh3d-parser-gcode/                       G-code reader and modal interpreter
-├── docs/                                        READERS.md, what every reader promises and what it does not do, and the data of the two pictures
+├── src/
+│   ├── gcode.rs                                 a part of the logic
+│   ├── lib.rs                                   the library: what every command uses
+│   ├── main.rs                                  the command line
+│   └── surface.rs                               a part of the logic
+├── tests/
+│   ├── autolevel.rs                             tests of the library and the command line
+│   └── strict.rs                                tests of the mark of a levelled program and of the strict command line
+├── examples/
+│   ├── sample.nc                                a sample to try the program with
+│   └── table.txt                                a sample to try the program with
+├── docs/
+│   ├── architecture.json                        data of the Architecture picture
+│   └── structure.json                           data of the Repository Structure picture
 ├── tools/                                       CI check, README check and the picture tools
 ├── images/                                      banner and the Architecture and Repository Structure pictures
 ├── .github/                                     CI and release workflows, issue and pull-request templates

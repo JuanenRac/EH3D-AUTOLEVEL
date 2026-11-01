@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Never levelled twice:** the corrected program starts with a comment line that says it was levelled and with which map; a program that carries it is refused with its line, because the correction of the table would be added twice.
+- **Strict command line:** an option that is written wrong (`--powr`) or a word too many is an error that names it; before, it was ignored and the output was made with the default values.
 - **Codes that change the origin or the offsets are refused:** G10, G28, G30, G38, G43, G53, G92 and any other G code that is not a plain move or a setting that leaves the position alone stop the program with the number of the line, instead of being turned into a move to Z0. A dwell (G4) is kept as it is, the `%` line of the start and the end of a program passes through, and a map that gives no finite height is refused instead of writing `Z NaN`.
 
 ## [0.0.1] - A G-code program corrected with the height map of the table, bilinear or bicubic

@@ -18,7 +18,7 @@
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 13 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Ainda não tem janela, não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
+**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 18 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Ainda não tem janela, não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Versão | `0.0.1` |
 | Maturidade | Estrutura inicial |
-| Testes | 13 |
+| Testes | 18 |
 | Tecnologias | Rust |
 | Em hardware real | Não experimentado: nada disto correu numa máquina |
 
@@ -47,7 +47,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 |---|---|---|
 | Núcleo | 🟡 | corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície; testado num computador com entradas normais e danificadas, não com uma coleção de ficheiros reais. |
 | Linha de comandos | 🟡 | `eh3d-autolevel` executa as mesmas funções da biblioteca e imprime o resultado; cada erro volta como mensagem e código de saída diferente de zero. |
-| Testes | 🟡 | 13 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
+| Testes | 🟡 | 18 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
 | Segurança | 🟡 | Rust seguro e simples (`forbid(unsafe_code)`): nada entra em pânico com os ficheiros recebidos e um valor mau é um erro com o seu motivo; sem revisão independente. |
 | Janela | 🔴 | Previsto: a janela egui comum à suíte; hoje existe apenas a linha de comandos. |
 | Hardware real | 🔴 | Não experimentado: nada disto foi executado numa máquina. |
@@ -58,6 +58,8 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 * **O programa** (`src/gcode.rs`): um movimento de corte (G1) é partido em pedaços não mais compridos do que o comprimento escolhido e cada pedaço recebe o Z que o mapa dá para o seu fim; um movimento rápido (G0) só é corrigido se tiver Z. O zero da correção é um ponto de referência, onde se fixou o Z do trabalho.
 * **A superfície** (`src/surface.rs`): bilinear (a do mapa do EH3D-COMMON) ou bicúbica (Catmull-Rom), que passa por todos os pontos medidos e segue melhor uma mesa curva; fora da grelha usa-se a altura da borda mais próxima.
 * **O que é recusado**, com o número da linha: distâncias relativas (G91), polegadas (G20), arcos (G2, G3), um movimento antes de qualquer G0 ou G1, um número que não o é, uma coordenada além de um milhão de milímetros, um movimento que daria mais de cem mil pedaços e um mapa com pontos por medir.
+* **Linha de comandos estrita:** uma opção mal escrita (`--powr`) ou uma palavra a mais é um erro que a nomeia, não algo que se ignora; caso contrário o programa faria a sua saída com os valores por omissão.
+* **Nunca nivelado duas vezes:** o programa corrigido começa com uma linha de comentário (`(eh3d-autolevel VERSÃO map=HASH ref=X,Y método seg=N)`) que diz que foi nivelado e com que mapa; um programa que a traga é recusado com a sua linha, porque corrigi-lo outra vez somaria duas vezes a correção da mesa.
 * **Os códigos que movem a origem são recusados:** G10, G28, G30, G38, G43, G53, G92 e qualquer outro código G que não seja um movimento simples nem uma definição que deixe a posição como está param o programa com o número da linha (antes eram convertidos em movimentos para Z0); uma espera (G4) e a linha `%` do início e do fim de um programa passam sem alterações, e um mapa sem altura finita é recusado em vez de escrever `Z NaN`.
 
 ## 🧩 Papel no EH3D
@@ -102,7 +104,8 @@ EH3D-AUTOLEVEL/
 │   ├── main.rs                                  a linha de comandos
 │   └── surface.rs                               uma parte da lógica
 ├── tests/
-│   └── autolevel.rs                             testes da biblioteca e da linha de comandos
+│   ├── autolevel.rs                             testes da biblioteca e da linha de comandos
+│   └── strict.rs                                testes da marca de um programa nivelado e da linha de comandos estrita
 ├── examples/
 │   ├── sample.nc                                um exemplo para experimentar o programa
 │   └── table.txt                                um exemplo para experimentar o programa
@@ -135,7 +138,7 @@ cargo run --release -- info examples/table.txt
 
 ## 🧪 Testes
 
-O conjunto tem 13 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
+O conjunto tem 18 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilação e publicação
 
@@ -152,11 +155,20 @@ A versão está em `Cargo.toml` e em `eh3d.project.json`; cada versão tem a sua
 
 ```text
 EH3D-AUTOLEVEL/
-├── crates/
-│   ├── eh3d-parser-gerber/                      leitor Gerber RS-274X
-│   ├── eh3d-parser-excellon/                    leitor de ficheiros de furação Excellon
-│   └── eh3d-parser-gcode/                       leitor e intérprete modal de G-code
-├── docs/                                        READERS.md, o que cada leitor promete e o que não faz, e os dados das duas imagens
+├── src/
+│   ├── gcode.rs                                 uma parte da lógica
+│   ├── lib.rs                                   a biblioteca: o que cada comando usa
+│   ├── main.rs                                  a linha de comandos
+│   └── surface.rs                               uma parte da lógica
+├── tests/
+│   ├── autolevel.rs                             testes da biblioteca e da linha de comandos
+│   └── strict.rs                                testes da marca de um programa nivelado e da linha de comandos estrita
+├── examples/
+│   ├── sample.nc                                um exemplo para experimentar o programa
+│   └── table.txt                                um exemplo para experimentar o programa
+├── docs/
+│   ├── architecture.json                        dados da imagem de Arquitetura
+│   └── structure.json                           dados da imagem de Estrutura
 ├── tools/                                       verificação da CI e do README e ferramentas de imagens
 ├── images/                                      banner e as imagens de Arquitetura e Estrutura do repositório
 ├── .github/                                     fluxos de CI e de publicação, modelos de issues e pull requests
