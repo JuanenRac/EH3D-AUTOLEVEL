@@ -58,6 +58,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 * **Il programma** (`src/gcode.rs`): un movimento di taglio (G1) è spezzato in tratti non più lunghi della lunghezza scelta e ogni tratto riceve la Z che la mappa dà per la sua fine; un movimento rapido (G0) è corretto solo se ha una Z. Lo zero della correzione è un punto di riferimento, dove è stata fissata la Z del lavoro.
 * **La superficie** (`src/surface.rs`): bilineare (quella della mappa di EH3D-COMMON) o bicubica (Catmull-Rom), che passa per ogni punto misurato e segue meglio un piano curvo; fuori dalla griglia si usa l'altezza del bordo più vicino.
 * **Ciò che è rifiutato**, con il numero di riga: distanze relative (G91), pollici (G20), archi (G2, G3), un movimento prima di qualsiasi G0 o G1, un numero che non lo è, una coordinata oltre un milione di millimetri, un movimento che darebbe più di centomila tratti e una mappa con punti non misurati.
+* **I codici che spostano l'origine sono rifiutati:** G10, G28, G30, G38, G43, G53, G92 e ogni altro codice G che non sia un semplice movimento né un'impostazione che lascia la posizione com'è fermano il programma con il numero di riga (prima diventavano movimenti verso Z0); una pausa (G4) e la riga `%` di inizio e fine programma passano invariate, e una mappa senza altezza finita viene rifiutata invece di scrivere `Z NaN`.
 
 ## 🧩 Ruolo in EH3D
 

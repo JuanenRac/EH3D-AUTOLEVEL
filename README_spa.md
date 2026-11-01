@@ -58,6 +58,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 * **El programa** (`src/gcode.rs`): un movimiento de corte (G1) se parte en trozos no más largos que la longitud elegida y cada trozo recibe la Z que da el mapa para su final; un movimiento rápido (G0) solo se corrige si lleva Z. El cero de la corrección es un punto de referencia, donde se fijó la Z del trabajo.
 * **La superficie** (`src/surface.rs`): bilineal (la del mapa de EH3D-COMMON) o bicúbica (Catmull-Rom), que pasa por todos los puntos medidos y sigue mejor una mesa curva; fuera de la malla se usa la altura del borde más cercano.
 * **Lo que se rechaza** con el número de línea: distancias relativas (G91), pulgadas (G20), arcos (G2, G3), un movimiento antes de cualquier G0 o G1, un número que no lo es, una coordenada más allá de un millón de milímetros, un movimiento que daría más de cien mil trozos y un mapa con puntos sin medir.
+* **Se rechazan los códigos que mueven el origen:** G10, G28, G30, G38, G43, G53, G92 y cualquier otro código G que no sea un movimiento simple ni un ajuste que deje la posición como está detienen el programa con el número de línea (antes se convertían en movimientos a Z0); una espera (G4) y la línea `%` del principio y del final de un programa pasan sin cambios, y un mapa que no da una altura finita se rechaza en vez de escribir `Z NaN`.
 
 ## 🧩 Papel en EH3D
 

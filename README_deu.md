@@ -58,6 +58,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 * **Das Programm** (`src/gcode.rs`): Eine Schnittbewegung (G1) wird in Stücke geschnitten, die nicht länger als die gewählte Länge sind, und jedes Stück erhält das Z, das die Karte für sein Ende liefert; eine Eilbewegung (G0) wird nur korrigiert, wenn sie ein Z hat. Der Nullpunkt der Korrektur ist ein Bezugspunkt, an dem das Z des Auftrags gesetzt wurde.
 * **Die Oberfläche** (`src/surface.rs`): bilinear (die der Karte in EH3D-COMMON) oder bikubisch (Catmull-Rom), die durch jeden gemessenen Punkt geht und einem gewölbten Tisch besser folgt; außerhalb des Gitters gilt die Höhe des nächsten Randes.
 * **Was abgelehnt wird**, mit der Zeilennummer: relative Maße (G91), Zoll (G20), Bögen (G2, G3), eine Bewegung vor jedem G0 oder G1, eine Zahl, die keine ist, eine Koordinate jenseits von einer Million Millimeter, eine Bewegung mit mehr als hunderttausend Stücken und eine Karte mit ungemessenen Punkten.
+* **Codes, die den Nullpunkt verschieben, werden abgelehnt:** G10, G28, G30, G38, G43, G53, G92 und jeder andere G-Code, der weder eine einfache Bewegung noch eine Einstellung ohne Positionsänderung ist, stoppen das Programm mit der Zeilennummer (früher wurden sie zu Bewegungen nach Z0); eine Verweilzeit (G4) und die `%`-Zeile am Anfang und Ende eines Programms laufen unverändert durch, und eine Karte ohne endliche Höhe wird abgelehnt, statt `Z NaN` zu schreiben.
 
 ## 🧩 Rolle in EH3D
 

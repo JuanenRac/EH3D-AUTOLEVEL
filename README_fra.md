@@ -58,6 +58,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 * **Le programme** (`src/gcode.rs`) : un mouvement de coupe (G1) est coupé en morceaux d'au plus la longueur choisie et chaque morceau reçoit le Z que donne la carte pour sa fin ; un mouvement rapide (G0) n'est corrigé que s'il a un Z. Le zéro de la correction est un point de référence, celui où le Z du travail a été fixé.
 * **La surface** (`src/surface.rs`) : bilinéaire (celle de la carte d'EH3D-COMMON) ou bicubique (Catmull-Rom), qui passe par chaque point mesuré et suit mieux une table courbe ; hors de la grille, la hauteur du bord le plus proche est utilisée.
 * **Ce qui est refusé**, avec le numéro de ligne : distances relatives (G91), pouces (G20), arcs (G2, G3), un mouvement avant tout G0 ou G1, un nombre qui n'en est pas un, une coordonnée au-delà d'un million de millimètres, un mouvement qui donnerait plus de cent mille morceaux et une carte aux points non mesurés.
+* **Les codes qui déplacent l'origine sont refusés :** G10, G28, G30, G38, G43, G53, G92 et tout autre code G qui n'est ni un simple mouvement ni un réglage laissant la position inchangée arrêtent le programme avec le numéro de la ligne (ils étaient transformés en mouvements vers Z0) ; une temporisation (G4) et la ligne `%` du début et de la fin d'un programme passent telles quelles, et une carte sans hauteur finie est refusée au lieu d'écrire `Z NaN`.
 
 ## 🧩 Rôle dans EH3D
 
