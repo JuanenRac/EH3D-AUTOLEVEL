@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 # the height map of the table (a path dependency on the sibling repository)
-eh3d-levelling = { path = "../EH3D-COMMON/crates/levelling" }
+eh3d-levelling = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/levelling" }
 
 [profile.release]
 opt-level = 3
