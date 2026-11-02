@@ -2,6 +2,9 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D). GPL-3.0-or-later.
 #![forbid(unsafe_code)]
 
+mod cli_args;
+
+use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::gcode::{correct, mark, Options};
 use eh3d_autolevel::surface::Method;
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
@@ -11,43 +14,12 @@ use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
 
-  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic]
+  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--dry-run]
   eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
 
+--dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
-
-fn flag(args: &mut Vec<String>, name: &str) -> Result<Option<String>, String> {
-    if let Some(i) = args.iter().position(|a| a == name) {
-        let v = args
-            .get(i + 1)
-            .ok_or_else(|| format!("{name} needs a value"))?
-            .clone();
-        args.drain(i..=i + 1);
-        return Ok(Some(v));
-    }
-    Ok(None)
-}
-
-/// What is left of the arguments once the options and the wanted words are taken must be nothing more than `max` words: an option that is written wrong or an extra word is an
-/// error, not something to ignore (the program would then make its output with the defaults).
-fn finish(args: &[String], max: usize) -> Result<(), String> {
-    if let Some(o) = args.iter().find(|a| a.starts_with("--")) {
-        return Err(format!("{o}: unknown option (see help)"));
-    }
-    if args.len() > max {
-        return Err(format!("{}: unexpected argument (see help)", args[max]));
-    }
-    Ok(())
-}
-
-fn number(text: &str, what: &str) -> Result<f64, String> {
-    text.trim()
-        .parse::<f64>()
-        .ok()
-        .filter(|v| v.is_finite())
-        .ok_or_else(|| format!("{what} '{text}' is not a number"))
-}
 
 fn load_map(path: &str) -> Result<HeightMap, String> {
     HeightMap::from_text(&fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?)
@@ -64,29 +36,40 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
         "apply" => {
             let mut opts = Options::default();
             if let Some(s) = flag(&mut args, "--segment")? {
-                opts.max_segment_mm = number(&s, "--segment")?;
+                opts.max_segment_mm = num(&s, "--segment")?;
             }
             if let Some(r) = flag(&mut args, "--ref")? {
                 let (x, y) = r.split_once(',').ok_or("--ref needs X,Y")?;
-                opts.reference = (number(x, "--ref X")?, number(y, "--ref Y")?);
+                opts.reference = (num(x, "--ref X")?, num(y, "--ref Y")?);
             }
-            if let Some(i) = args.iter().position(|a| a == "--bicubic") {
-                args.remove(i);
+            if switch(&mut args, "--bicubic") {
                 opts.method = Method::Bicubic;
             }
-            if args.len() < 3 {
-                return Err("apply needs a map, an input program and an output file".into());
+            let dry_run = switch(&mut args, "--dry-run");
+            let needed = if dry_run { 2 } else { 3 };
+            if args.len() < needed {
+                return Err(if dry_run {
+                    "apply needs a map and an input program".into()
+                } else {
+                    "apply needs a map, an input program and an output file".into()
+                });
             }
             finish(&args, 3)?;
             let map = load_map(&args[0])?;
             let text = fs::read_to_string(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?;
             let (out, r) = correct(&text, &map, &opts)?;
-            fs::write(&args[2], mark(&out, &map, &opts))
-                .map_err(|e| format!("{}: {e}", args[2]))?;
-            println!(
+            let summary = format!(
                 "{} moves corrected, {} pieces added, Z shifted from {:+.4} to {:+.4} mm",
                 r.moves, r.pieces_added, r.shift_min, r.shift_max
             );
+            if dry_run {
+                // the program is corrected and counted, and nothing is written
+                println!("dry run, nothing written: {summary}");
+                return Ok(());
+            }
+            fs::write(&args[2], mark(&out, &map, &opts))
+                .map_err(|e| format!("{}: {e}", args[2]))?;
+            println!("{summary}");
             Ok(())
         }
         "info" => {
@@ -106,7 +89,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 return Err("demo-map needs OUT X0 Y0 X1 Y1 COLS ROWS".into());
             }
             finish(&args, 7)?;
-            let n = |k: usize, w: &str| number(&args[k], w);
+            let n = |k: usize, w: &str| num(&args[k], w);
             let cols = args[5]
                 .parse::<usize>()
                 .map_err(|_| format!("COLS '{}' is not a whole number", args[5]))?;
