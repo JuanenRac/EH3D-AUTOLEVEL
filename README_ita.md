@@ -18,7 +18,7 @@
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 18 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Non ha ancora una finestra, non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
+**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 28 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Non ha ancora una finestra, non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Versione | `0.0.2` |
 | Maturità | Impalcatura |
-| Test | 18 |
+| Test | 28 |
 | Stack tecnologico | Rust |
 | Su hardware reale | Non provato: nulla di questo ha girato su una macchina |
 
@@ -47,7 +47,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 |---|---|---|
 | Nucleo | 🟡 | corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie; provato su un computer con input normali e danneggiati, non con una raccolta di file reali. |
 | Riga di comando | 🟡 | `eh3d-autolevel` esegue le stesse funzioni della libreria e stampa il risultato; ogni errore torna come messaggio e codice di uscita diverso da zero. |
-| Test | 🟡 | 18 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. |
+| Test | 🟡 | 28 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. |
 | Sicurezza | 🟡 | Rust sicuro e semplice (`forbid(unsafe_code)`): nulla va in panico con i file ricevuti e un valore errato è un errore con il suo motivo; nessuna revisione indipendente. |
 | Finestra | 🔴 | Previsto: la finestra egui comune alla suite; oggi esiste solo la riga di comando. |
 | Hardware reale | 🔴 | Non provato: nulla di questo è stato eseguito su una macchina. |
@@ -61,6 +61,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 * **Riga di comando rigorosa:** un'opzione scritta male (`--powr`) o una parola in più è un errore che la nomina, non qualcosa da ignorare; altrimenti il programma farebbe la sua uscita con i valori predefiniti.
 * **Mai livellato due volte:** il programma corretto inizia con una riga di commento (`(eh3d-autolevel VERSIONE map=HASH ref=X,Y metodo seg=N)`) che dice che è stato livellato e con quale mappa; un programma che la porta viene rifiutato con la sua riga, perché correggerlo di nuovo sommerebbe due volte la correzione del tavolo.
 * **I codici che spostano l'origine sono rifiutati:** G10, G28, G30, G38, G43, G53, G92 e ogni altro codice G che non sia un semplice movimento né un'impostazione che lascia la posizione com'è fermano il programma con il numero di riga (prima diventavano movimenti verso Z0); una pausa (G4) e la riga `%` di inizio e fine programma passano invariate, e una mappa senza altezza finita viene rifiutata invece di scrivere `Z NaN`.
+* **`--dry-run`:** `apply` calcola il risultato e lo conta (movimenti, pezzi aggiunti, spostamento di Z) senza scrivere il file di uscita, che allora può essere omesso.
 
 ## 🧩 Ruolo in EH3D
 
@@ -99,12 +100,15 @@ La libreria è `eh3d_autolevel` (`use eh3d_autolevel::...`); la riga di comando 
 ```text
 EH3D-AUTOLEVEL/
 ├── src/
-│   ├── gcode.rs                                 una parte della logica
 │   ├── lib.rs                                   la libreria: ciò che usa ogni comando
 │   ├── main.rs                                  la riga di comando
+│   ├── cli_args.rs                              gli argomenti della riga di comando, lo stesso file in ogni piccola utilità
+│   ├── gcode.rs                                 una parte della logica
 │   └── surface.rs                               una parte della logica
 ├── tests/
 │   ├── autolevel.rs                             test della libreria e della riga di comando
+│   ├── dry_run.rs                               test di --dry-run: conta lo stesso e non scrive nulla
+│   ├── readme.rs                                test che eseguono ciò che promettono il README e gli script run
 │   └── strict.rs                                test del contrassegno di un programma livellato e della riga di comando rigorosa
 ├── examples/
 │   ├── sample.nc                                un esempio per provare il programma
@@ -138,7 +142,7 @@ cargo run --release -- info examples/table.txt
 
 ## 🧪 Test
 
-La suite ha 18 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
+La suite ha 28 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilazione e rilascio
 
@@ -156,12 +160,15 @@ La versione sta in `Cargo.toml` e in `eh3d.project.json`; ogni versione ha la su
 ```text
 EH3D-AUTOLEVEL/
 ├── src/
-│   ├── gcode.rs                                 una parte della logica
 │   ├── lib.rs                                   la libreria: ciò che usa ogni comando
 │   ├── main.rs                                  la riga di comando
+│   ├── cli_args.rs                              gli argomenti della riga di comando, lo stesso file in ogni piccola utilità
+│   ├── gcode.rs                                 una parte della logica
 │   └── surface.rs                               una parte della logica
 ├── tests/
 │   ├── autolevel.rs                             test della libreria e della riga di comando
+│   ├── dry_run.rs                               test di --dry-run: conta lo stesso e non scrive nulla
+│   ├── readme.rs                                test che eseguono ciò che promettono il README e gli script run
 │   └── strict.rs                                test del contrassegno di un programma livellato e della riga di comando rigorosa
 ├── examples/
 │   ├── sample.nc                                un esempio per provare il programma

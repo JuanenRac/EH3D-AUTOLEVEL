@@ -18,7 +18,7 @@
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 18 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Ainda não tem janela, não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
+**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 28 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Ainda não tem janela, não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Versão | `0.0.2` |
 | Maturidade | Estrutura inicial |
-| Testes | 18 |
+| Testes | 28 |
 | Tecnologias | Rust |
 | Em hardware real | Não experimentado: nada disto correu numa máquina |
 
@@ -47,7 +47,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 |---|---|---|
 | Núcleo | 🟡 | corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície; testado num computador com entradas normais e danificadas, não com uma coleção de ficheiros reais. |
 | Linha de comandos | 🟡 | `eh3d-autolevel` executa as mesmas funções da biblioteca e imprime o resultado; cada erro volta como mensagem e código de saída diferente de zero. |
-| Testes | 🟡 | 18 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
+| Testes | 🟡 | 28 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
 | Segurança | 🟡 | Rust seguro e simples (`forbid(unsafe_code)`): nada entra em pânico com os ficheiros recebidos e um valor mau é um erro com o seu motivo; sem revisão independente. |
 | Janela | 🔴 | Previsto: a janela egui comum à suíte; hoje existe apenas a linha de comandos. |
 | Hardware real | 🔴 | Não experimentado: nada disto foi executado numa máquina. |
@@ -61,6 +61,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 * **Linha de comandos estrita:** uma opção mal escrita (`--powr`) ou uma palavra a mais é um erro que a nomeia, não algo que se ignora; caso contrário o programa faria a sua saída com os valores por omissão.
 * **Nunca nivelado duas vezes:** o programa corrigido começa com uma linha de comentário (`(eh3d-autolevel VERSÃO map=HASH ref=X,Y método seg=N)`) que diz que foi nivelado e com que mapa; um programa que a traga é recusado com a sua linha, porque corrigi-lo outra vez somaria duas vezes a correção da mesa.
 * **Os códigos que movem a origem são recusados:** G10, G28, G30, G38, G43, G53, G92 e qualquer outro código G que não seja um movimento simples nem uma definição que deixe a posição como está param o programa com o número da linha (antes eram convertidos em movimentos para Z0); uma espera (G4) e a linha `%` do início e do fim de um programa passam sem alterações, e um mapa sem altura finita é recusado em vez de escrever `Z NaN`.
+* **`--dry-run`:** `apply` calcula o resultado e conta-o (movimentos, pedaços acrescentados, deslocamento de Z) sem escrever o ficheiro de saída, que então pode ser omitido.
 
 ## 🧩 Papel no EH3D
 
@@ -99,12 +100,15 @@ A biblioteca é `eh3d_autolevel` (`use eh3d_autolevel::...`); a linha de comando
 ```text
 EH3D-AUTOLEVEL/
 ├── src/
-│   ├── gcode.rs                                 uma parte da lógica
 │   ├── lib.rs                                   a biblioteca: o que cada comando usa
 │   ├── main.rs                                  a linha de comandos
+│   ├── cli_args.rs                              os argumentos da linha de comandos, o mesmo ficheiro em cada utilitário pequeno
+│   ├── gcode.rs                                 uma parte da lógica
 │   └── surface.rs                               uma parte da lógica
 ├── tests/
 │   ├── autolevel.rs                             testes da biblioteca e da linha de comandos
+│   ├── dry_run.rs                               testes de --dry-run: conta o mesmo e não escreve nada
+│   ├── readme.rs                                testes que executam o que o README e os scripts run prometem
 │   └── strict.rs                                testes da marca de um programa nivelado e da linha de comandos estrita
 ├── examples/
 │   ├── sample.nc                                um exemplo para experimentar o programa
@@ -138,7 +142,7 @@ cargo run --release -- info examples/table.txt
 
 ## 🧪 Testes
 
-O conjunto tem 18 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
+O conjunto tem 28 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilação e publicação
 
@@ -156,12 +160,15 @@ A versão está em `Cargo.toml` e em `eh3d.project.json`; cada versão tem a sua
 ```text
 EH3D-AUTOLEVEL/
 ├── src/
-│   ├── gcode.rs                                 uma parte da lógica
 │   ├── lib.rs                                   a biblioteca: o que cada comando usa
 │   ├── main.rs                                  a linha de comandos
+│   ├── cli_args.rs                              os argumentos da linha de comandos, o mesmo ficheiro em cada utilitário pequeno
+│   ├── gcode.rs                                 uma parte da lógica
 │   └── surface.rs                               uma parte da lógica
 ├── tests/
 │   ├── autolevel.rs                             testes da biblioteca e da linha de comandos
+│   ├── dry_run.rs                               testes de --dry-run: conta o mesmo e não escreve nada
+│   ├── readme.rs                                testes que executam o que o README e os scripts run prometem
 │   └── strict.rs                                testes da marca de um programa nivelado e da linha de comandos estrita
 ├── examples/
 │   ├── sample.nc                                um exemplo para experimentar o programa
