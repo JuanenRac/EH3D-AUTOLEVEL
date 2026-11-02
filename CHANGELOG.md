@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.0.2] - A program is never levelled twice, a strict command line and the versions of the sibling repositories
+
 - **Each dependency on a sibling repository by path says the version it needs** (`version = ">=0.0.1", path = "../EH3D-..."`), so Cargo stops at once when the sibling next to this one is older than the program expects.
 - **Never levelled twice:** the corrected program starts with a comment line that says it was levelled and with which map; a program that carries it is refused with its line, because the correction of the table would be added twice.
 - **Strict command line:** an option that is written wrong (`--powr`) or a word too many is an error that names it; before, it was ignored and the output was made with the default values.
