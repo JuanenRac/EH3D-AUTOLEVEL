@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **Shared checks updated:** the validator also compares the badge and the Version row of the README with the manifest, fails when one of its checks cannot run, and the CHANGELOG step of the workflow reads the base branch from the environment.
 - **The original is not overwritten:** `apply` refuses an output file that is also the map and writes the corrected program through a temporary file (levelling in place still works), and the level mark goes after the leading `%` of programs with Windows line ends too.
 - **The workflows are hardened:** every action is pinned by its commit with its version in a comment, and the checkouts keep no credentials.
 - **Modal words kept:** a move line that also carries G90, G54 or another allowed G word keeps it when the move is rewritten.
