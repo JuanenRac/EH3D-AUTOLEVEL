@@ -58,14 +58,15 @@ fn a_dry_run_needs_no_output_file_but_still_refuses_what_is_wrong() {
 }
 
 #[test]
-fn the_output_may_not_be_the_program_or_the_map() {
+fn the_output_may_not_be_the_map_and_levelling_in_place_leaves_no_temporary_file() {
     let (map, prog, _) = files();
-    let before = std::fs::read_to_string(&prog).unwrap();
-    let (ok, _, e) = run(&["apply", &map, &prog, &prog]);
-    assert!(!ok && e.contains("also an input"), "{e}");
+    let before = std::fs::read_to_string(&map).unwrap();
     let (ok, _, e) = run(&["apply", &map, &prog, &map]);
-    assert!(!ok && e.contains("also an input"), "{e}");
-    assert_eq!(std::fs::read_to_string(&prog).unwrap(), before);
+    assert!(!ok && e.contains("also the map"), "{e}");
+    assert_eq!(std::fs::read_to_string(&map).unwrap(), before);
+    let (ok, _, e) = run(&["apply", &map, &prog, &prog]);
+    assert!(ok, "{e}");
+    assert!(!Path::new(&format!("{prog}.tmp")).exists());
 }
 
 #[test]

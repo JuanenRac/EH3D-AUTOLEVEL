@@ -66,10 +66,10 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 });
             }
             finish(&args, 3)?;
-            // the output may not be the program or the map: the original would be lost
-            if !dry_run && (same_file(&args[2], &args[1]) || same_file(&args[2], &args[0])) {
+            // the output may be the program (levelling in place: the mark refuses a second run) but never the map
+            if !dry_run && same_file(&args[2], &args[0]) {
                 return Err(format!(
-                    "{}: the output file is also an input; write the corrected program to a new file",
+                    "{}: the output file is also the map; write the corrected program to another file",
                     args[2]
                 ));
             }
@@ -85,8 +85,14 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 println!("dry run, nothing written: {summary}");
                 return Ok(());
             }
-            fs::write(&args[2], mark(&out, &map, &opts))
-                .map_err(|e| format!("{}: {e}", args[2]))?;
+            // written beside and renamed, so that a program levelled in place is never left half written
+            let tmp = format!("{}.tmp", args[2]);
+            fs::write(&tmp, mark(&out, &map, &opts))
+                .and_then(|()| fs::rename(&tmp, &args[2]))
+                .map_err(|e| {
+                    let _ = fs::remove_file(&tmp);
+                    format!("{}: {e}", args[2])
+                })?;
             println!("{summary}");
             Ok(())
         }
