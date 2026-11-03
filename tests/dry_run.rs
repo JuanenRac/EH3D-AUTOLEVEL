@@ -59,7 +59,10 @@ fn a_dry_run_needs_no_output_file_but_still_refuses_what_is_wrong() {
 
 #[test]
 fn the_output_may_not_be_the_map_and_levelling_in_place_leaves_no_temporary_file() {
-    let (map, prog, _) = files();
+    let (map, shared, _) = files();
+    // a copy of its own: the tests of this file run together and share the others
+    let prog = format!("{shared}.inplace.nc");
+    std::fs::copy(&shared, &prog).unwrap();
     let before = std::fs::read_to_string(&map).unwrap();
     let (ok, _, e) = run(&["apply", &map, &prog, &map]);
     assert!(!ok && e.contains("also the map"), "{e}");
