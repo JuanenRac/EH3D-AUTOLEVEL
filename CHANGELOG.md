@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 - **The workflows are hardened:** every action is pinned by its commit with its version in a comment, and the checkouts keep no credentials.
 - **Modal words kept:** a move line that also carries G90, G54 or another allowed G word keeps it when the move is rewritten.
+- **More tests:** the mark of a levelled program, the bicubic surface at the edges and on a plane, the methods side by side and the lines of a postprocessor.
 
 ## [0.0.4] - CI hardening and shared validator
 
