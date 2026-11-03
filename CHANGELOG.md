@@ -3,6 +3,9 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+
+## [0.0.5] - Audit fixes, the new reading limits, tests and the application icon
+
 - **The application icon and the logos of the program:** `images/brand/` holds the icon (SVG, PNG sizes, `.ico` and `.icns`), the horizontal and vertical logos in a light and a dark version and the social preview image.
 - **Shared checks updated:** the validator also compares the badge and the Version row of the README with the manifest, fails when one of its checks cannot run, and the CHANGELOG step of the workflow reads the base branch from the environment.
 - **The original is not overwritten:** `apply` refuses an output file that is also the map and writes the corrected program through a temporary file (levelling in place still works), and the level mark goes after the leading `%` of programs with Windows line ends too.
