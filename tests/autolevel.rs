@@ -549,3 +549,17 @@ fn bicubic_never_leaves_the_range_of_the_neighbours_by_more_than_the_overshoot_o
         "a zig-zag of 0.05 mm must not swing by more than that: {worst}"
     );
 }
+
+#[test]
+fn modal_g_words_on_a_move_line_are_kept() {
+    let flat = HeightMap::flat(Grid::new((0.0, 0.0, 100.0, 100.0), 3, 3), 0.0);
+    let (out, _) = correct(
+        "G90 G54 G0 X10 Y10\nG21 G1 X10 Y10 Z-0.1 F100\n",
+        &flat,
+        &Options::default(),
+    )
+    .unwrap();
+    let mut lines = out.lines();
+    assert_eq!(lines.next().unwrap(), "G90 G54 G0 X10 Y10");
+    assert_eq!(lines.next().unwrap(), "G21 G1 X10 Y10 Z-0.1 F100");
+}

@@ -159,6 +159,8 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         let w = words(raw, n)?;
         let mut moves_here = false;
         let mut dwell = false;
+        // the modal G words that share the line with a move (G90, G54...) go in front of the rewritten move
+        let mut kept: Vec<String> = Vec::new();
         for &(letter, value) in &w {
             match (letter, value) {
                 ('G', v)
@@ -173,7 +175,7 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                         || v == 94.0
                         || (54.0..=59.0).contains(&v)
                         || v == 90.1
-                        || v == 91.1 => {}
+                        || v == 91.1 => kept.push(format!("G{}", fmt(v))),
                 // a dwell takes its time in P (or X on some controllers): the line is not a move
                 ('G', 4.0) => dwell = true,
                 ('G', 91.0) => {
@@ -235,7 +237,8 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             report.shift_max = report.shift_max.max(shift);
         };
         if m == 0 {
-            let mut line = vec!["G0".to_string()];
+            let mut line = kept.clone();
+            line.push("G0".to_string());
             for (l, v) in w.iter().filter(|(l, _)| matches!(l, 'X' | 'Y')) {
                 line.push(format!("{l}{}", fmt(*v)));
             }
@@ -264,6 +267,9 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 let shift = at(x, y, n)? - zero;
                 track(shift);
                 let mut line = format!("G1 X{} Y{} Z{}", fmt(x), fmt(y), fmt(z + shift));
+                if k == 1 && !kept.is_empty() {
+                    line = format!("{} {line}", kept.join(" "));
+                }
                 if k == 1 && !others.is_empty() {
                     line.push(' ');
                     line.push_str(&others.join(" "));
