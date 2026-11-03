@@ -15,19 +15,19 @@ fn run(args: &[&str]) -> (bool, String, String) {
     )
 }
 
-fn files() -> (String, String, String) {
+fn files(tag: &str) -> (String, String, String) {
     let dir = env!("CARGO_TARGET_TMPDIR");
-    let map = format!("{dir}/dry-map.txt");
-    let prog = format!("{dir}/dry-in.nc");
+    let map = format!("{dir}/dry-{tag}-map.txt");
+    let prog = format!("{dir}/dry-{tag}-in.nc");
     let (ok, _, e) = run(&["demo-map", &map, "0", "0", "100", "100", "3", "3"]);
     assert!(ok, "{e}");
     std::fs::write(&prog, "G90 G21\nG0 X0 Y0\nG1 Z-0.1 F100\nG1 X50 Y0\nM2\n").unwrap();
-    (map, prog, format!("{dir}/dry-out.nc"))
+    (map, prog, format!("{dir}/dry-{tag}-out.nc"))
 }
 
 #[test]
 fn a_dry_run_counts_the_same_and_writes_nothing() {
-    let (map, prog, out) = files();
+    let (map, prog, out) = files("count");
     let _ = std::fs::remove_file(&out);
     let (ok, real, e) = run(&["apply", &map, &prog, &out]);
     assert!(ok, "{e}");
@@ -43,7 +43,7 @@ fn a_dry_run_counts_the_same_and_writes_nothing() {
 
 #[test]
 fn a_dry_run_needs_no_output_file_but_still_refuses_what_is_wrong() {
-    let (map, prog, out) = files();
+    let (map, prog, out) = files("refuse");
     let (ok, dry, e) = run(&["apply", &map, &prog, "--dry-run"]);
     assert!(ok && dry.contains("moves corrected"), "{dry} {e}");
     let (ok, _, e) = run(&["apply", &map, "--dry-run"]);
@@ -59,7 +59,7 @@ fn a_dry_run_needs_no_output_file_but_still_refuses_what_is_wrong() {
 
 #[test]
 fn the_output_may_not_be_the_map_and_levelling_in_place_leaves_no_temporary_file() {
-    let (map, shared, _) = files();
+    let (map, shared, _) = files("inplace");
     // a copy of its own: the tests of this file run together and share the others
     let prog = format!("{shared}.inplace.nc");
     std::fs::copy(&shared, &prog).unwrap();
