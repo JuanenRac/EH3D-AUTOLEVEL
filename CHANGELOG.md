@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+
+- **Faster, bounded CI:** the Cargo build is cached, a run that a newer push supersedes is cancelled, every job has a time limit, and the Rust jobs live in their own workflow that is skipped when only documents or images change.
+- **A fixed Rust toolchain:** `rust-toolchain.toml` names the compiler version (with rustfmt and clippy) that the CI installs, so a new stable release cannot turn the lints red without a change here.
+- **Monthly dependency updates:** Dependabot opens one grouped pull request a month for the GitHub Actions.
+- **A line for every change:** a pull request that changes code must add a line under `[Unreleased]` of this file (`tools/changelog_pr_check.py`; the label `no-changelog` skips it).
+- **Shared checks updated:** the validator of the suite checks the text of the banner against the manifest and reads the files that git tracks.
 - **More tests:** comments that name a forbidden code, tables of any level, the exact number of pieces of a move, modal moves, Windows line ends, numbers with signs and dots, the limits of the coordinates, the marks of a levelled program and every error of the command line.
 
 ## [0.0.3] - Dry run and shared argument helper
