@@ -26,6 +26,17 @@ fn load_map(path: &str) -> Result<HeightMap, String> {
         .map_err(|e| format!("{path}: {e}"))
 }
 
+/// True when two paths name the same file (compared once resolved; by their text when one does not exist yet).
+fn same_file(a: &str, b: &str) -> bool {
+    match (
+        std::path::Path::new(a).canonicalize(),
+        std::path::Path::new(b).canonicalize(),
+    ) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => a == b,
+    }
+}
+
 fn run(mut args: Vec<String>) -> Result<(), String> {
     if args.is_empty() || matches!(args[0].as_str(), "help" | "--help" | "-h") {
         println!("{HELP}");
@@ -55,6 +66,13 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 });
             }
             finish(&args, 3)?;
+            // the output may not be the program or the map: the original would be lost
+            if !dry_run && (same_file(&args[2], &args[1]) || same_file(&args[2], &args[0])) {
+                return Err(format!(
+                    "{}: the output file is also an input; write the corrected program to a new file",
+                    args[2]
+                ));
+            }
             let map = load_map(&args[0])?;
             let text = fs::read_to_string(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?;
             let (out, r) = correct(&text, &map, &opts)?;

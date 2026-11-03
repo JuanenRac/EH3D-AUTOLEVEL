@@ -56,3 +56,30 @@ fn a_dry_run_needs_no_output_file_but_still_refuses_what_is_wrong() {
     let (ok, _, e) = run(&["apply", &map, &prog, "--dry-run", "--oops"]);
     assert!(!ok && e.contains("--oops"), "{e}");
 }
+
+#[test]
+fn the_output_may_not_be_the_program_or_the_map() {
+    let (map, prog, _) = files();
+    let before = std::fs::read_to_string(&prog).unwrap();
+    let (ok, _, e) = run(&["apply", &map, &prog, &prog]);
+    assert!(!ok && e.contains("also an input"), "{e}");
+    let (ok, _, e) = run(&["apply", &map, &prog, &map]);
+    assert!(!ok && e.contains("also an input"), "{e}");
+    assert_eq!(std::fs::read_to_string(&prog).unwrap(), before);
+}
+
+#[test]
+fn the_mark_goes_after_the_percent_sign_of_a_program_with_windows_line_ends() {
+    use eh3d_autolevel::gcode::{mark, Options};
+    use eh3d_levelling::{Grid, HeightMap};
+    let map = HeightMap::flat(Grid::new((0.0, 0.0, 100.0, 100.0), 3, 3), 0.0);
+    for lead in ["%\r\n", "%\n"] {
+        let program = format!("{lead}G0 X1 Y1\r\n%\r\n");
+        let marked = mark(&program, &map, &Options::default());
+        assert!(marked.starts_with(lead), "{marked:?}");
+        assert!(
+            marked[lead.len()..].starts_with("(eh3d-autolevel"),
+            "{marked:?}"
+        );
+    }
+}

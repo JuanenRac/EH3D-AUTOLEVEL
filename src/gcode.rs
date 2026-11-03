@@ -116,10 +116,13 @@ pub fn mark(program: &str, map: &HeightMap, opts: &Options) -> String {
         opts.method,
         fmt(opts.max_segment_mm)
     );
-    match program.strip_prefix("%\n") {
-        Some(rest) => format!("%\n{line}{rest}"),
-        None => format!("{line}{program}"),
+    // the '%' that opens the program stays first, with the line end it has
+    for lead in ["%\r\n", "%\n"] {
+        if let Some(rest) = program.strip_prefix(lead) {
+            return format!("{lead}{line}{rest}");
+        }
     }
+    format!("{line}{program}")
 }
 
 /// Corrects `text` with `map`. The map must be complete. A program that already carries the mark of a levelled one is refused: its Z is already corrected.
