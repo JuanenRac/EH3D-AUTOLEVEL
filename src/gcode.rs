@@ -14,6 +14,8 @@ pub struct Options {
     /// The point whose height is the zero of the correction (where the Z of the job was set).
     pub reference: (f64, f64),
     pub method: Method,
+    /// The most lines the corrected program may have. A program that would pass it is refused before the pieces are made, so a tiny `max_segment_mm` cannot fill the memory.
+    pub max_output_lines: usize,
 }
 
 impl Default for Options {
@@ -22,6 +24,7 @@ impl Default for Options {
             max_segment_mm: 1.0,
             reference: (0.0, 0.0),
             method: Method::Bilinear,
+            max_output_lines: DEFAULT_MAX_OUTPUT_LINES,
         }
     }
 }
@@ -39,6 +42,8 @@ pub struct Report {
 
 const MAX_COORDINATE: f64 = 1.0e6;
 const MAX_PIECES: usize = 100_000;
+/// The default of [`Options::max_output_lines`].
+pub const DEFAULT_MAX_OUTPUT_LINES: usize = 5_000_000;
 
 /// The words of a line without its comments: `(...)` and everything after `;`.
 fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
@@ -47,6 +52,8 @@ fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
     for c in line.chars() {
         match c {
             ';' if depth == 0 => break,
+            // the checksum of a numbered line (`N10 G1 X5*45`) is not a word
+            '*' if depth == 0 => break,
             '(' => depth += 1,
             ')' if depth > 0 => depth -= 1,
             _ if depth == 0 => clean.push(c),
@@ -79,6 +86,21 @@ fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
         out.push((letter, value));
     }
     Ok(out)
+}
+
+/// Whether a line is one that is passed on as it is: `$` commands of GRBL, `#` parameter assignments and the message commands M117 and M118 with their text. Only the lines that move
+/// are held to the strict rules of the words; the strictness is about positions, not about every character a controller accepts.
+fn is_not_a_move(line: &str) -> bool {
+    let t = line.trim_start();
+    if t.starts_with('$') || t.starts_with('#') {
+        return true;
+    }
+    let upper = t.to_ascii_uppercase();
+    ["M117", "M118"].iter().any(|m| {
+        upper
+            .strip_prefix(m)
+            .is_some_and(|rest| !rest.starts_with(|c: char| c.is_ascii_digit() || c == '.'))
+    })
 }
 
 fn fmt(v: f64) -> String {
@@ -159,6 +181,12 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             out.push('\n');
             continue;
         }
+        // lines that are not moves and have no words to read: a system command of GRBL (`$H`), a parameter assignment (`#1=5`) and the text of a message (`M117 Hello`)
+        if is_not_a_move(raw) {
+            out.push_str(raw);
+            out.push('\n');
+            continue;
+        }
         let w = words(raw, n)?;
         let mut moves_here = false;
         let mut dwell = false;
@@ -229,11 +257,19 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 ));
             }
         }
-        let others: Vec<String> = w
-            .iter()
-            .filter(|(l, _)| !matches!(l, 'G' | 'X' | 'Y' | 'Z'))
-            .map(|(l, v)| format!("{l}{}", fmt(*v)))
-            .collect();
+        // the M words of a move happen when the move is done (`G1 X50 M5` stops the spindle at X50, not at the first piece): in a cut move they go with the last piece
+        let (m_words, others): (Vec<String>, Vec<String>) = {
+            let rest: Vec<(char, f64)> = w
+                .iter()
+                .filter(|(l, _)| !matches!(l, 'G' | 'X' | 'Y' | 'Z'))
+                .copied()
+                .collect();
+            let text = |&(l, v): &(char, f64)| format!("{l}{}", fmt(v));
+            (
+                rest.iter().filter(|(l, _)| *l == 'M').map(text).collect(),
+                rest.iter().filter(|(l, _)| *l != 'M').map(text).collect(),
+            )
+        };
         let has_z = w.iter().any(|(l, _)| *l == 'Z');
         let mut track = |shift: f64| {
             report.shift_min = report.shift_min.min(shift);
@@ -252,6 +288,7 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 report.moves += 1;
             }
             line.extend(others);
+            line.extend(m_words);
             out.push_str(&line.join(" "));
             out.push('\n');
         } else {
@@ -259,6 +296,9 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             let pieces = ((length / opts.max_segment_mm).ceil().max(1.0)) as usize;
             if pieces > MAX_PIECES {
                 return Err(format!("line {n}: the move would be cut in {pieces} pieces (more than {MAX_PIECES}); use a longer piece"));
+            }
+            if i + report.pieces_added + pieces > opts.max_output_lines {
+                return Err(format!("line {n}: the corrected program would have more than {} lines; use a longer piece (--segment) or raise the limit (--max-lines)", opts.max_output_lines));
             }
             for k in 1..=pieces {
                 let t = k as f64 / pieces as f64;
@@ -276,6 +316,10 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 if k == 1 && !others.is_empty() {
                     line.push(' ');
                     line.push_str(&others.join(" "));
+                }
+                if k == pieces && !m_words.is_empty() {
+                    line.push(' ');
+                    line.push_str(&m_words.join(" "));
                 }
                 out.push_str(&line);
                 out.push('\n');

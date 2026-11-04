@@ -81,6 +81,7 @@ Wie die Teile dieses Repositorys zusammenpassen: wer es nutzt, was es enthält u
 * **Tests mit beschädigten Eingaben:** Die Tests füttern auch leere Dateien, Datenmüll, riesige Zahlen und abgeschnittene Dateien; keiner darf in Panik geraten.
 * **Kein Raten:** Ein unsinniger Wert ist ein Fehler, der sagt welcher und warum, nie ein Ergebnis, das nur richtig aussieht.
 * **Kein unsafe-Code:** `#![forbid(unsafe_code)]` in Bibliothek und Programm.
+* **Zeilen, die keine Bewegungen sind, werden durchgereicht:** `$`-Befehle, `#`-Zuweisungen und die Meldungen `M117` und `M118` bleiben unverändert, die Prüfsumme einer nummerierten Zeile ist kein Wort, die `M`-Wörter einer zerlegten Bewegung gehören zum letzten Stück, und `--max-lines` (standardmäßig 5000000) lehnt ein Programm mit mehr Ausgabezeilen ab.
 
 ## 🔒 Sicherheit und Schutz
 

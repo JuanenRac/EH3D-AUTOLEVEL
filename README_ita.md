@@ -81,6 +81,7 @@ Come si incastrano le parti di questo repository: chi lo usa, cosa contiene e da
 * **Test con input danneggiati:** i test forniscono anche file vuoti, spazzatura, numeri enormi e file tagliati, e nessuno può andare in panico.
 * **Nessuna ipotesi:** un valore privo di senso è un errore che dice quale e perché, mai un risultato che sembra solo giusto.
 * **Nessun codice unsafe:** `#![forbid(unsafe_code)]` nella libreria e nel programma.
+* **Le righe che non sono movimenti passano così come sono:** i comandi `$`, le assegnazioni `#` e i messaggi `M117` e `M118` sono scritti com'erano, il checksum di una riga numerata non è una parola, le parole `M` di un movimento suddiviso vanno con l'ultimo pezzo e `--max-lines` (5000000 per impostazione predefinita) rifiuta un programma con più righe di uscita.
 
 ## 🔒 Sicurezza e protezione
 

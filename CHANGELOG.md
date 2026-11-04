@@ -3,6 +3,9 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **Lines that are not moves pass through:** `$` commands, `#` assignments and the messages `M117` and `M118` are written as they are, and the checksum of a numbered line is not read as a word.
+- **The M words of a cut move go with its last piece:** `G1 X50 M5` stops the spindle at the end of the move and not at its first piece.
+- **The size of the output is limited:** `--max-lines` (5000000 by default) refuses a program that would have more lines, before the pieces are made.
 
 ## [0.0.5] - Audit fixes, the new reading limits, tests and the application icon
 

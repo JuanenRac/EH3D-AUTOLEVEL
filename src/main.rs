@@ -14,7 +14,7 @@ use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
 
-  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--dry-run]
+  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
   eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
 
@@ -52,6 +52,13 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if let Some(r) = flag(&mut args, "--ref")? {
                 let (x, y) = r.split_once(',').ok_or("--ref needs X,Y")?;
                 opts.reference = (num(x, "--ref X")?, num(y, "--ref Y")?);
+            }
+            if let Some(m) = flag(&mut args, "--max-lines")? {
+                let lines = num(&m, "--max-lines")?;
+                if !(lines >= 1.0 && lines.fract() == 0.0 && lines <= 100_000_000.0) {
+                    return Err(format!("--max-lines {m} must be a whole number from 1 to 100000000"));
+                }
+                opts.max_output_lines = lines as usize;
             }
             if switch(&mut args, "--bicubic") {
                 opts.method = Method::Bicubic;

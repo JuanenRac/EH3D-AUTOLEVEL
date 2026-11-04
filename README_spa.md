@@ -81,6 +81,7 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 * **Pruebas con entradas dañadas:** las pruebas también dan ficheros vacíos, basura, números enormes y ficheros cortados, y ninguna puede provocar un pánico.
 * **Sin adivinar:** un valor que no tiene sentido es un error que dice cuál y por qué, nunca un resultado que solo lo parece.
 * **Sin código unsafe:** `#![forbid(unsafe_code)]` en la biblioteca y el programa.
+* **Las líneas que no son movimientos pasan tal cual:** los comandos `$`, las asignaciones `#` y los mensajes `M117` y `M118` se escriben como están, la suma de comprobación de una línea numerada no es una palabra, las palabras `M` de un movimiento cortado van con su última pieza y `--max-lines` (5000000 por defecto) rechaza un programa con más líneas de salida.
 
 ## 🔒 Seguridad y protección
 

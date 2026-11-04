@@ -155,3 +155,49 @@ fn the_percent_lines_of_a_postprocessor_are_kept_and_the_levelling_does_not_chan
     assert!(out.starts_with("%\n") && out.ends_with("%\n"), "{out}");
     assert!(out.contains("X30 Y20"));
 }
+
+#[test]
+fn lines_that_are_not_moves_pass_through_and_a_checksum_is_not_a_word() {
+    let program = "$H\n#1=5\nM117 Hello world\nM118 text 1\nG21 G90\nG0 X0 Y0\nN10 G1 X10 Y0 F100*45\nM2\n";
+    let (out, _) = correct(program, &plane(0.001, 0.0), &Options::default()).unwrap();
+    for kept in ["$H", "#1=5", "M117 Hello world", "M118 text 1", "M2"] {
+        assert!(out.lines().any(|l| l == kept), "{kept}: {out}");
+    }
+    assert!(out.lines().any(|l| l.starts_with("G1 X") && l.contains("F100")), "{out}");
+    // a move that is not understood is still refused with its line
+    let err = correct("G0 X0 Y0\nG1 X[1+2] Y0\n", &plane(0.001, 0.0), &Options::default()).unwrap_err();
+    assert!(err.starts_with("line 2"), "{err}");
+}
+
+#[test]
+fn the_m_words_of_a_cut_move_go_with_its_last_piece_and_the_rest_with_the_first() {
+    let opts = Options {
+        max_segment_mm: 25.0,
+        ..Options::default()
+    };
+    let (out, _) = correct("G0 X0 Y0\nG1 X50 F200 M5\n", &plane(0.001, 0.0), &opts).unwrap();
+    let cuts: Vec<&str> = out.lines().filter(|l| l.starts_with("G1")).collect();
+    assert_eq!(cuts.len(), 2, "{out}");
+    assert!(cuts[0].contains("F200") && !cuts[0].contains("M5"), "{out}");
+    assert!(cuts[1].ends_with("M5") && !cuts[1].contains("F200"), "{out}");
+    // a move that is not cut has everything on its only line
+    let (one, _) = correct("G0 X0 Y0\nG1 X5 F200 M5\n", &plane(0.001, 0.0), &opts).unwrap();
+    assert!(one.lines().any(|l| l.contains("F200") && l.ends_with("M5")), "{one}");
+}
+
+#[test]
+fn a_program_with_too_many_output_lines_is_refused_before_the_pieces_are_made() {
+    let opts = Options {
+        max_segment_mm: 0.001,
+        max_output_lines: 1000,
+        ..Options::default()
+    };
+    let err = correct("G0 X0 Y0\nG1 X50 F200\n", &plane(0.001, 0.0), &opts).unwrap_err();
+    assert!(err.contains("more than 1000 lines"), "{err}");
+    // a program that fits is not touched by the limit
+    let fits = Options {
+        max_output_lines: 1000,
+        ..Options::default()
+    };
+    assert!(correct("G0 X0 Y0\nG1 X50 F200\n", &plane(0.001, 0.0), &fits).is_ok());
+}

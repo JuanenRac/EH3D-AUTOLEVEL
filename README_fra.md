@@ -81,6 +81,7 @@ Comment les parties de ce dépôt s'articulent : qui l'utilise, ce qu'il contien
 * **Tests avec entrées abîmées :** les tests fournissent aussi des fichiers vides, du bruit, des nombres énormes et des fichiers coupés, et aucun ne doit paniquer.
 * **Sans deviner :** une valeur absurde est une erreur qui dit laquelle et pourquoi, jamais un résultat qui n'en a que l'air.
 * **Pas de code unsafe :** `#![forbid(unsafe_code)]` dans la bibliothèque et le programme.
+* **Les lignes qui ne sont pas des déplacements passent telles quelles :** les commandes `$`, les affectations `#` et les messages `M117` et `M118` sont écrits comme ils sont, la somme de contrôle d'une ligne numérotée n'est pas un mot, les mots `M` d'un déplacement découpé vont avec son dernier morceau, et `--max-lines` (5000000 par défaut) refuse un programme qui aurait plus de lignes de sortie.
 
 ## 🔒 Sécurité et protection
 
