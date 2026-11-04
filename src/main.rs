@@ -56,7 +56,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if let Some(m) = flag(&mut args, "--max-lines")? {
                 let lines = num(&m, "--max-lines")?;
                 if !(lines >= 1.0 && lines.fract() == 0.0 && lines <= 100_000_000.0) {
-                    return Err(format!("--max-lines {m} must be a whole number from 1 to 100000000"));
+                    return Err(format!(
+                        "--max-lines {m} must be a whole number from 1 to 100000000"
+                    ));
                 }
                 opts.max_output_lines = lines as usize;
             }
