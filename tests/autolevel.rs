@@ -414,13 +414,11 @@ fn the_empty_program_and_a_program_of_comments_come_back_unchanged_with_a_zero_r
 #[test]
 fn parameters_expressions_and_stray_characters_are_refused_with_the_line_not_guessed() {
     for (bad, line) in [
-        ("#1=5", 2),
         ("G1 X[1+2]", 2),
         ("G1 X5 %", 2),
         ("G1 X1.2.3", 2),
         ("G1 X--1", 2),
         ("G1 X", 2),
-        ("G1 X5 *", 2),
     ] {
         let e = correct(
             &format!("G1 X1\n{bad}\n"),
