@@ -25,7 +25,7 @@
       "level": "config",
       "title": "Machine control",
       "lines": [
-        "planned: MOTIONCNC will",
+        "planned: PHOENIX-CNC will",
         "correct while it sends"
       ]
     },
