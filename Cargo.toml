@@ -2,7 +2,7 @@
 name = "eh3d-autolevel"
 version = "0.0.5"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.88"
 description = "Corrects the Z of a G-code program with the height map of the table: long moves are cut in pieces that follow the surface"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/JuanenRac/EH3D-AUTOLEVEL"
@@ -16,10 +16,27 @@ path = "src/lib.rs"
 name = "eh3d-autolevel"
 path = "src/main.rs"
 
+[features]
+default = []
+# the window (egui, with the icon of the program): `cargo run --release --features gui`
+gui = ["dep:eframe", "dep:png"]
+
 [dependencies]
 # the height map of the table (a path dependency on the sibling repository)
 eh3d-levelling = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/levelling" }
 
+# the window
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"], optional = true }
+png = { version = "0.17", optional = true }
+
+# the window of Linux needs a windowing system chosen at build time (X11 and Wayland); Windows and macOS have their own
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"], optional = true }
+
 [profile.release]
 opt-level = 3
 lto = true
+
+# the icon and the version information of the Windows executable (build.rs; nothing on other systems)
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1.34"

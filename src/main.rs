@@ -17,6 +17,7 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
   eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
   eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+  eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui): with no arguments, with files (a program, a map) or with gui it opens; the commands above never open it
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
@@ -43,6 +44,10 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
         return Ok(());
     }
     let cmd = args.remove(0);
+    if cmd == "gui" {
+        // a build with the window never gets here (main opens it): this one is only a command line
+        return Err("this build has no window: build it with --features gui".into());
+    }
     match cmd.as_str() {
         "apply" => {
             let mut opts = Options::default();
@@ -150,8 +155,46 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
     }
 }
 
+/// Whether the program opens its window instead of running a command, and the files to open in it: no arguments, `gui` (with files or without), or only files given by the system to
+/// open (names with an extension that are files; the commands have none).
+#[cfg(feature = "gui")]
+fn window_request(args: &[String]) -> Option<Vec<String>> {
+    match args {
+        [] => Some(Vec::new()),
+        [a, files @ ..] if a == "gui" => Some(files.to_vec()),
+        files
+            if files.iter().all(|f| {
+                !f.starts_with('-')
+                    && std::path::Path::new(f).extension().is_some()
+                    && std::path::Path::new(f).is_file()
+            }) =>
+        {
+            Some(files.to_vec())
+        }
+        _ => None,
+    }
+}
+
+#[cfg(feature = "gui")]
+fn open_window(files: Vec<String>) -> ExitCode {
+    let lang = eh3d_autolevel::lang::Lang::from_env();
+    let files = files.into_iter().map(std::path::PathBuf::from).collect();
+    match eh3d_autolevel::gui::run(files, lang) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: the window could not be opened: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
 fn main() -> ExitCode {
-    match run(env::args().skip(1).collect()) {
+    let args: Vec<String> = env::args().skip(1).collect();
+    #[cfg(feature = "gui")]
+    if let Some(files) = window_request(&args) {
+        return open_window(files);
+    }
+    match run(args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");
