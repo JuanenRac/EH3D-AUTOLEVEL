@@ -46,7 +46,7 @@ const MAX_PIECES: usize = 100_000;
 pub const DEFAULT_MAX_OUTPUT_LINES: usize = 5_000_000;
 
 /// The words of a line without its comments: `(...)` and everything after `;`.
-fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
+pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
     let mut clean = String::new();
     let mut depth = 0;
     for c in line.chars() {
