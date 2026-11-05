@@ -17,7 +17,7 @@
 
 ---
 
-**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 68 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Todavía no tiene ventana, no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
+**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 124 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.0.5` |
 | Madurez | Andamiaje |
-| Pruebas | 68 |
+| Pruebas | 124 |
 | Pila tecnológica | Rust |
 | En hardware real | No probado: nada de esto se ha ejecutado en una máquina |
 
@@ -46,9 +46,9 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 |---|---|---|
 | Núcleo | 🟡 | corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie; probado en un ordenador con entradas normales y dañadas, no con una colección de ficheros reales. |
 | Línea de comandos | 🟡 | `eh3d-autolevel` ejecuta las mismas funciones que la biblioteca e imprime el resultado; cada error vuelve como mensaje y un código de salida distinto de cero. |
-| Pruebas | 🟡 | 68 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. |
+| Pruebas | 🟡 | 124 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. |
 | Seguridad | 🟡 | Rust seguro y simple (`forbid(unsafe_code)`): nada entra en pánico con los ficheros recibidos y un valor malo es un error con su motivo; sin revisión independiente. |
-| Ventana | 🔴 | Previsto: la ventana egui común a la suite; hoy solo existe la línea de comandos. |
+| Ventana | 🟠 | Escrita (egui, `--features gui`): abrir o soltar un programa y un mapa de alturas, simular una mesa, ver la mesa como malla coloreada y las trayectorias niveladas, zoom y desplazamiento, ajustar la nivelación, exportar; su lógica está probada, pero todavía no se ha compilado ni visto en una pantalla. |
 | Hardware real | 🔴 | No probado: nada de esto se ha ejecutado en una máquina. |
 | Documentación | 🟡 | README en ocho idiomas, el registro de cambios y las dos imágenes dibujadas desde `docs/`. |
 
@@ -64,7 +64,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 
 ## 🧩 Papel en EH3D
 
-EH3D-AUTOLEVEL es un programa de la EH3D Fabrication Suite. Hoy funciona como biblioteca y línea de comandos; su ventana, con el aspecto que comparten los demás programas de la suite, está prevista. Lee y escribe ficheros simples, así que puede usarse solo o entre los demás programas.
+EH3D-AUTOLEVEL es un programa de la EH3D Fabrication Suite. Funciona como biblioteca y línea de comandos y, compilado con `--features gui`, como ventana con el aspecto que comparten los demás programas de la suite. Lee y escribe ficheros simples, así que puede usarse solo o entre los demás programas.
 
 ## 🏛️ Arquitectura
 
@@ -98,33 +98,10 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 La biblioteca es `eh3d_autolevel` (`use eh3d_autolevel::...`); la línea de comandos es `eh3d-autolevel`. Las órdenes son estas; cada una imprime su resultado por la salida estándar e informa de un error por la salida de errores con un código de salida distinto de cero. No hay acceso a la red.
 
 ```text
-EH3D-AUTOLEVEL/
-├── src/
-│   ├── lib.rs                                   la biblioteca: lo que usa cada orden
-│   ├── main.rs                                  la línea de comandos
-│   ├── cli_args.rs                              los argumentos de la línea de comandos, el mismo fichero en cada utilidad pequeña
-│   ├── gcode.rs                                 una parte de la lógica
-│   └── surface.rs                               una parte de la lógica
-├── tests/
-│   ├── autolevel.rs                             pruebas de la biblioteca y la línea de comandos
-│   ├── dry_run.rs                               pruebas de --dry-run: cuenta lo mismo y no escribe nada
-│   ├── readme.rs                                pruebas que ejecutan lo que prometen el README y los scripts run
-│   └── strict.rs                                pruebas de la marca de un programa nivelado y de la línea de comandos estricta
-├── examples/
-│   ├── sample.nc                                una muestra para probar el programa
-│   └── table.txt                                una muestra para probar el programa
-├── docs/
-│   ├── architecture.json                        datos de la imagen de Arquitectura
-│   └── structure.json                           datos de la imagen de Estructura
-├── tools/                                       comprobación del CI y del README y herramientas de imágenes
-├── images/                                      banner y las imágenes de Arquitectura y Estructura del repositorio
-├── .github/                                     flujos de CI y de publicación, plantillas de issues y pull requests
-├── eh3d.project.json                            manifiesto: versión, rol, madurez y comando de compilación
-├── Cargo.toml Cargo.lock                        el workspace y sus dependencias fijadas
-├── rust-toolchain.toml                          la toolchain de Rust fijada
-├── CHANGELOG.md                                 qué cambió en cada versión
-├── SECURITY.md SUPPORT.md                       cómo informar de una vulnerabilidad y dónde preguntar
-└── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   cómo contribuir, el código de conducta y la licencia
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ Configuración
@@ -133,17 +110,18 @@ Todavía no hay fichero de configuración: lo que elige la persona se da como ar
 
 ## 🚀 Inicio rápido
 
-Necesita una cadena de herramientas Rust estable (1.75 o más reciente).
+Necesita una cadena de herramientas Rust estable (1.88 o más reciente).
 
 ```bash
 cargo build --release
 cargo test
 cargo run --release -- info examples/table.txt
+cargo run --release --features gui   # the window
 ```
 
 ## 🧪 Pruebas
 
-El conjunto tiene 68 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
+El conjunto tiene 124 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilación y publicación
 
@@ -165,12 +143,18 @@ EH3D-AUTOLEVEL/
 │   ├── main.rs                                  la línea de comandos
 │   ├── cli_args.rs                              los argumentos de la línea de comandos, el mismo fichero en cada utilidad pequeña
 │   ├── gcode.rs                                 una parte de la lógica
-│   └── surface.rs                               una parte de la lógica
+│   ├── surface.rs                               una parte de la lógica
+│   ├── browse.rs                                la lista de ficheros de la ventana que abre un fichero
+│   ├── gui.rs                                   la ventana (egui, con la característica gui): dibuja el estado y transmite lo que hace la persona
+│   ├── lang.rs                                  las palabras de la ventana en los ocho idiomas
+│   ├── viewport.rs                              zoom y desplazamiento de la imagen, en números simples
+│   └── window.rs                                el estado de la ventana sin pantalla: programa, mapa, ajustes y exportación
 ├── tests/
 │   ├── autolevel.rs                             pruebas de la biblioteca y la línea de comandos
 │   ├── dry_run.rs                               pruebas de --dry-run: cuenta lo mismo y no escribe nada
 │   ├── readme.rs                                pruebas que ejecutan lo que prometen el README y los scripts run
-│   └── strict.rs                                pruebas de la marca de un programa nivelado y de la línea de comandos estricta
+│   ├── strict.rs                                pruebas de la marca de un programa nivelado y de la línea de comandos estricta
+│   └── window_cli.rs                            pruebas de que una compilación sin la característica gui sigue siendo solo línea de comandos
 ├── examples/
 │   ├── sample.nc                                una muestra para probar el programa
 │   └── table.txt                                una muestra para probar el programa
@@ -194,14 +178,14 @@ EH3D-AUTOLEVEL/
 
 **Límites conocidos hoy**
 
-* Todavía no tiene ventana: solo existen la biblioteca y la línea de comandos.
+* La ventana todavía no se ha visto en una pantalla y no puede medir una mesa: el mapa se abre de un fichero o se simula.
 * No se ha probado en una máquina ni con una colección de ficheros reales y no ha tenido revisión independiente.
 * Los arcos se rechazan en vez de partirse en trozos, se supone que el programa empieza en X0 Y0 Z0 y el mapa viene de la sonda de la suite o de una mesa simulada, no de una medida real.
 
 **Siguiente**
 
 * Partir los arcos en trozos, tomar la posición inicial de la máquina y corregir el programa mientras se envía, no antes.
-* Añadir la ventana con el aspecto compartido por los programas de la suite, en los ocho idiomas.
+* Ver la ventana en una pantalla y terminarla.
 * Probarlo con ficheros reales y con los demás programas de la suite.
 
 ## 🌍 Idiomas

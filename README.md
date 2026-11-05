@@ -17,7 +17,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 68 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has no window yet, it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 124 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.5` |
 | Maturity | Scaffolding |
-| Tests | 68 |
+| Tests | 124 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -46,9 +46,9 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 68 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
+| Tests | 🟡 | 124 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
-| Window | 🔴 | Planned: the egui window common to the suite; today there is only the command line. |
+| Window | 🟠 | Written (egui, `--features gui`): open or drop a program and a height map, simulate a table, see the table as a coloured mesh and the levelled paths, zoom and pan, set the levelling, export; its logic is tested, but it has not been built or looked at on a screen yet. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
 | Documentation | 🟡 | README in eight languages, the changelog and the two pictures drawn from `docs/`. |
 
@@ -64,7 +64,7 @@ Each line is one part of this repository and the light says how far it is today.
 
 ## 🧩 Role in EH3D
 
-EH3D-AUTOLEVEL is one program of the EH3D Fabrication Suite. Today it works as a library and a command line; its window, in the look the other programs of the suite share, is planned. It reads and writes plain files, so it can be used on its own or between the other programs.
+EH3D-AUTOLEVEL is one program of the EH3D Fabrication Suite. It works as a library and a command line and, built with `--features gui`, as a window in the look the other programs of the suite share. It reads and writes plain files, so it can be used on its own or between the other programs.
 
 ## 🏛️ Architecture
 
@@ -98,33 +98,10 @@ How the parts of this repository fit together: who uses it, what it holds and wh
 The library is `eh3d_autolevel` (`use eh3d_autolevel::...`); the command line is `eh3d-autolevel`. The commands are these; each prints its result on the standard output and reports an error on the standard error with a non-zero exit code. There is no network access.
 
 ```text
-EH3D-AUTOLEVEL/
-├── src/
-│   ├── lib.rs                                   the library: what every command uses
-│   ├── main.rs                                  the command line
-│   ├── cli_args.rs                              the arguments of the command line, the same file in every small utility
-│   ├── gcode.rs                                 a part of the logic
-│   └── surface.rs                               a part of the logic
-├── tests/
-│   ├── autolevel.rs                             tests of the library and the command line
-│   ├── dry_run.rs                               tests of --dry-run: it counts the same and writes nothing
-│   ├── readme.rs                                tests that run what the README and the run scripts promise
-│   └── strict.rs                                tests of the mark of a levelled program and of the strict command line
-├── examples/
-│   ├── sample.nc                                a sample to try the program with
-│   └── table.txt                                a sample to try the program with
-├── docs/
-│   ├── architecture.json                        data of the Architecture picture
-│   └── structure.json                           data of the Repository Structure picture
-├── tools/                                       CI check, README check and the picture tools
-├── images/                                      banner and the Architecture and Repository Structure pictures
-├── .github/                                     CI and release workflows, issue and pull-request templates
-├── eh3d.project.json                            manifest: version, role, maturity and build command
-├── Cargo.toml Cargo.lock                        the workspace and its locked dependencies
-├── rust-toolchain.toml                          the pinned Rust toolchain
-├── CHANGELOG.md                                 what changed in each version
-├── SECURITY.md SUPPORT.md                       how to report a vulnerability and where to ask
-└── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   how to contribute, the code of conduct and the licence
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ Configuration
@@ -133,17 +110,18 @@ There is no configuration file yet: what a person chooses is given as arguments 
 
 ## 🚀 Quick start
 
-You need a stable Rust toolchain (1.75 or newer).
+You need a stable Rust toolchain (1.88 or newer).
 
 ```bash
 cargo build --release
 cargo test
 cargo run --release -- info examples/table.txt
+cargo run --release --features gui   # the window
 ```
 
 ## 🧪 Testing
 
-The suite has 68 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 124 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 
@@ -165,12 +143,18 @@ EH3D-AUTOLEVEL/
 │   ├── main.rs                                  the command line
 │   ├── cli_args.rs                              the arguments of the command line, the same file in every small utility
 │   ├── gcode.rs                                 a part of the logic
-│   └── surface.rs                               a part of the logic
+│   ├── surface.rs                               a part of the logic
+│   ├── browse.rs                                the list of files of the window that opens a file
+│   ├── gui.rs                                   the window (egui, with the gui feature): draws the state and passes on what the person does
+│   ├── lang.rs                                  the words of the window in the eight languages
+│   ├── viewport.rs                              zoom and pan of the picture, in plain numbers
+│   └── window.rs                                the state of the window without a screen: program, map, settings and export
 ├── tests/
 │   ├── autolevel.rs                             tests of the library and the command line
 │   ├── dry_run.rs                               tests of --dry-run: it counts the same and writes nothing
 │   ├── readme.rs                                tests that run what the README and the run scripts promise
-│   └── strict.rs                                tests of the mark of a levelled program and of the strict command line
+│   ├── strict.rs                                tests of the mark of a levelled program and of the strict command line
+│   └── window_cli.rs                            tests that a build without the gui feature stays a command line
 ├── examples/
 │   ├── sample.nc                                a sample to try the program with
 │   └── table.txt                                a sample to try the program with
@@ -194,14 +178,14 @@ EH3D-AUTOLEVEL/
 
 **Known limits today**
 
-* It has no window yet: only the library and the command line exist.
+* The window has not been looked at on a screen yet and cannot measure a table: the map is opened from a file or simulated.
 * It has not been tried on a machine nor with a collection of real files, and it has had no independent review.
 * Arcs are refused instead of being cut in pieces, the program is assumed to start at X0 Y0 Z0, and the map comes from the probe of the suite or from a simulated table, not from a real measure.
 
 **Next**
 
 * Cut arcs into pieces, take the start position from the machine and correct the program while it is sent, not before.
-* Add the window in the look shared by the programs of the suite, in the eight languages.
+* Look at the window on a screen and finish it.
 * Try it with real files and with the other programs of the suite.
 
 ## 🌍 Languages

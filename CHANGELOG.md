@@ -3,6 +3,10 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **A window:** built with `--features gui`, `eh3d-autolevel` with no arguments (or with files, or `gui [FILE...]`) opens a window in the look of the other programs of the suite (amber on charcoal, the icon of the program). A G-code program and a height map are opened from the list of files of the window or dropped on it (the first line tells a map from a program); the table is drawn as a coloured mesh, the original path and the levelled path over it (coloured by the table under each piece), with zoom (wheel), pan (drag) and the height of the table under the pointer; the longest piece, the reference point, the surface (bilinear or bicubic) and the most output lines can be edited, a simulated table can be made, and the levelled program (with the mark that says it was levelled) and the map are exported. The command line works as before, and a build without the feature is only a command line.
+- **The window speaks the eight languages:** English, Spanish, German, French, Italian, Japanese, Chinese and Portuguese of Portugal, chosen from the system and changeable in the window.
+- **The logic of the window needs no screen:** `window` (program, map, settings, levelling, paths, colours, export, status), `viewport` (zoom and pan), `browse` (the list of files) and `lang` (the words) are plain code with their own tests; `gui` only draws them. `gcode::words` is public for the picture of the paths.
+- **The Rust version needed is 1.88,** the one the window needs.
 - **Lines that are not moves pass through:** `$` commands, `#` assignments and the messages `M117` and `M118` are written as they are, and the checksum of a numbered line is not read as a word.
 - **The M words of a cut move go with its last piece:** `G1 X50 M5` stops the spindle at the end of the move and not at its first piece.
 - **The size of the output is limited:** `--max-lines` (5000000 by default) refuses a program that would have more lines, before the pieces are made.

@@ -17,7 +17,7 @@
 
 ---
 
-**Ehrlichkeitscheck - was heute wirklich läuft:** eine Rust-Bibliothek und ein Kommandozeilenprogramm (`eh3d-autolevel`) mit 68 Tests, die auf einem Computer laufen: korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen. Es hat noch kein Fenster, wurde an keiner Maschine ausprobiert und nicht an einer Sammlung echter Dateien geprüft.
+**Ehrlichkeitscheck - was heute wirklich läuft:** eine Rust-Bibliothek und ein Kommandozeilenprogramm (`eh3d-autolevel`) mit 124 Tests, die auf einem Computer laufen: korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen. Es hat ein Fenster (Build mit `--features gui`), das ein G-Code-Programm und eine Höhenkarte öffnet, den Tisch als farbiges Netz mit den nivellierten Bahnen darüber zeigt und exportiert, aber das Fenster wurde noch nicht auf einem Bildschirm angesehen; wurde an keiner Maschine ausprobiert und nicht an einer Sammlung echter Dateien geprüft.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.5` |
 | Reifegrad | Gerüst |
-| Tests | 68 |
+| Tests | 124 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nicht erprobt: nichts davon lief an einer Maschine |
 
@@ -46,9 +46,9 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 |---|---|---|
 | Kern | 🟡 | korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen; am Computer mit normalen und beschädigten Eingaben getestet, nicht mit einer Sammlung echter Dateien. |
 | Kommandozeile | 🟡 | `eh3d-autolevel` führt dieselben Funktionen wie die Bibliothek aus und gibt das Ergebnis aus; jeder Fehler kommt als Meldung mit einem Exit-Code ungleich null zurück. |
-| Tests | 🟡 | 68 Tests bestehen (`cargo test`), mit Normalfällen, Grenzfällen und beschädigten Eingaben. |
+| Tests | 🟡 | 124 Tests bestehen (`cargo test`), mit Normalfällen, Grenzfällen und beschädigten Eingaben. |
 | Sicherheit | 🟡 | Reines sicheres Rust (`forbid(unsafe_code)`): nichts gerät bei den übergebenen Dateien in Panik und ein schlechter Wert ist ein Fehler mit Begründung; keine unabhängige Prüfung. |
-| Fenster | 🔴 | Geplant: das egui-Fenster, das die Suite gemeinsam nutzt; heute gibt es nur die Kommandozeile. |
+| Fenster | 🟠 | Geschrieben (egui, `--features gui`): Programm und Höhenkarte öffnen oder hineinziehen, einen Tisch simulieren, den Tisch als farbiges Netz und die nivellierten Bahnen sehen, Zoom und Verschieben, die Nivellierung einstellen, exportieren; die Logik ist getestet, aber noch nicht gebaut oder auf einem Bildschirm angesehen. |
 | Echte Hardware | 🔴 | Nicht erprobt: nichts davon wurde an einer Maschine ausgeführt. |
 | Dokumentation | 🟡 | README in acht Sprachen, das Changelog und die zwei aus `docs/` gezeichneten Bilder. |
 
@@ -64,7 +64,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 
 ## 🧩 Rolle in EH3D
 
-EH3D-AUTOLEVEL ist ein Programm der EH3D Fabrication Suite. Heute arbeitet es als Bibliothek und Kommandozeile; sein Fenster im gemeinsamen Aussehen der Suite ist geplant. Es liest und schreibt einfache Dateien und lässt sich allein oder zwischen den anderen Programmen nutzen.
+EH3D-AUTOLEVEL ist ein Programm der EH3D Fabrication Suite. Es arbeitet als Bibliothek und Kommandozeile und, mit `--features gui` gebaut, als Fenster im gemeinsamen Aussehen der Suite. Es liest und schreibt einfache Dateien und lässt sich allein oder zwischen den anderen Programmen nutzen.
 
 ## 🏛️ Architektur
 
@@ -98,33 +98,10 @@ Wie die Teile dieses Repositorys zusammenpassen: wer es nutzt, was es enthält u
 Die Bibliothek ist `eh3d_autolevel` (`use eh3d_autolevel::...`); die Kommandozeile ist `eh3d-autolevel`. Die Befehle sind diese; jeder gibt sein Ergebnis auf der Standardausgabe aus und meldet einen Fehler auf der Fehlerausgabe mit einem Exit-Code ungleich null. Es gibt keinen Netzwerkzugriff.
 
 ```text
-EH3D-AUTOLEVEL/
-├── src/
-│   ├── lib.rs                                   die Bibliothek: was jeder Befehl nutzt
-│   ├── main.rs                                  die Kommandozeile
-│   ├── cli_args.rs                              die Argumente der Kommandozeile, dieselbe Datei in jedem kleinen Werkzeug
-│   ├── gcode.rs                                 ein Teil der Logik
-│   └── surface.rs                               ein Teil der Logik
-├── tests/
-│   ├── autolevel.rs                             Tests von Bibliothek und Kommandozeile
-│   ├── dry_run.rs                               Tests von --dry-run: zählt dasselbe und schreibt nichts
-│   ├── readme.rs                                Tests, die ausführen, was README und run-Skripte versprechen
-│   └── strict.rs                                Tests der Markierung eines nivellierten Programms und der strengen Kommandozeile
-├── examples/
-│   ├── sample.nc                                ein Beispiel zum Ausprobieren
-│   └── table.txt                                ein Beispiel zum Ausprobieren
-├── docs/
-│   ├── architecture.json                        Daten des Architektur-Bildes
-│   └── structure.json                           Daten des Struktur-Bildes
-├── tools/                                       CI-Prüfung, README-Prüfung und die Bildwerkzeuge
-├── images/                                      Banner und die Bilder von Architektur und Repository-Struktur
-├── .github/                                     CI- und Release-Workflows, Vorlagen für Issues und Pull Requests
-├── eh3d.project.json                            Manifest: Version, Rolle, Reifegrad und Build-Befehl
-├── Cargo.toml Cargo.lock                        der Workspace und seine festgelegten Abhängigkeiten
-├── rust-toolchain.toml                          die festgelegte Rust-Toolchain
-├── CHANGELOG.md                                 was sich in jeder Version geändert hat
-├── SECURITY.md SUPPORT.md                       Schwachstellen melden und Fragen stellen
-└── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   Mitwirken, Verhaltenskodex und Lizenz
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ Konfiguration
@@ -133,17 +110,18 @@ Es gibt noch keine Konfigurationsdatei: Was die Person wählt, wird als Argument
 
 ## 🚀 Schnellstart
 
-Sie brauchen eine stabile Rust-Toolchain (1.75 oder neuer).
+Sie brauchen eine stabile Rust-Toolchain (1.88 oder neuer).
 
 ```bash
 cargo build --release
 cargo test
 cargo run --release -- info examples/table.txt
+cargo run --release --features gui   # the window
 ```
 
 ## 🧪 Tests
 
-Die Suite hat 68 Tests (`cargo test`, in der CI unter Windows und Linux). Sie prüfen Normalfälle, Grenzfälle und beschädigte Eingaben: leere Dateien, Datenmüll und abgeschnittene Dateien lösen nie eine Panik aus. Die CI führt außerdem `cargo fmt --check`, `cargo clippy` mit Warnungen als Fehlern und `python -I tools/ci_validate.py` aus.
+Die Suite hat 124 Tests (`cargo test`, in der CI unter Windows und Linux). Sie prüfen Normalfälle, Grenzfälle und beschädigte Eingaben: leere Dateien, Datenmüll und abgeschnittene Dateien lösen nie eine Panik aus. Die CI führt außerdem `cargo fmt --check`, `cargo clippy` mit Warnungen als Fehlern und `python -I tools/ci_validate.py` aus.
 
 ## 🏗️ Build und Veröffentlichung
 
@@ -165,12 +143,18 @@ EH3D-AUTOLEVEL/
 │   ├── main.rs                                  die Kommandozeile
 │   ├── cli_args.rs                              die Argumente der Kommandozeile, dieselbe Datei in jedem kleinen Werkzeug
 │   ├── gcode.rs                                 ein Teil der Logik
-│   └── surface.rs                               ein Teil der Logik
+│   ├── surface.rs                               ein Teil der Logik
+│   ├── browse.rs                                die Dateiliste des Fensters zum Öffnen einer Datei
+│   ├── gui.rs                                   das Fenster (egui, mit dem Feature gui): zeichnet den Zustand und gibt weiter, was die Person tut
+│   ├── lang.rs                                  die Wörter des Fensters in den acht Sprachen
+│   ├── viewport.rs                              Zoom und Verschiebung des Bildes, in einfachen Zahlen
+│   └── window.rs                                der Zustand des Fensters ohne Bildschirm: Programm, Karte, Einstellungen, Export
 ├── tests/
 │   ├── autolevel.rs                             Tests von Bibliothek und Kommandozeile
 │   ├── dry_run.rs                               Tests von --dry-run: zählt dasselbe und schreibt nichts
 │   ├── readme.rs                                Tests, die ausführen, was README und run-Skripte versprechen
-│   └── strict.rs                                Tests der Markierung eines nivellierten Programms und der strengen Kommandozeile
+│   ├── strict.rs                                Tests der Markierung eines nivellierten Programms und der strengen Kommandozeile
+│   └── window_cli.rs                            Tests, dass ein Build ohne das Feature gui eine reine Kommandozeile bleibt
 ├── examples/
 │   ├── sample.nc                                ein Beispiel zum Ausprobieren
 │   └── table.txt                                ein Beispiel zum Ausprobieren
@@ -194,14 +178,14 @@ EH3D-AUTOLEVEL/
 
 **Bekannte Grenzen heute**
 
-* Es hat noch kein Fenster: nur Bibliothek und Kommandozeile existieren.
+* Das Fenster wurde noch nicht auf einem Bildschirm angesehen und kann keinen Tisch messen: Die Karte wird aus einer Datei geöffnet oder simuliert.
 * Es wurde weder an einer Maschine noch mit einer Sammlung echter Dateien erprobt und hatte keine unabhängige Prüfung.
 * Bögen werden abgelehnt statt in Stücke geschnitten, das Programm beginnt angenommen bei X0 Y0 Z0, und die Karte stammt von der Sonde der Suite oder einem simulierten Tisch, nicht von einer echten Messung.
 
 **Als Nächstes**
 
 * Bögen in Stücke schneiden, die Startposition von der Maschine übernehmen und das Programm beim Senden korrigieren, nicht vorher.
-* Das Fenster im gemeinsamen Aussehen der Suite in den acht Sprachen ergänzen.
+* Das Fenster auf einem Bildschirm ansehen und fertigstellen.
 * Mit echten Dateien und den anderen Programmen der Suite ausprobieren.
 
 ## 🌍 Sprachen

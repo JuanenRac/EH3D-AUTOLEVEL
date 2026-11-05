@@ -2,7 +2,7 @@
   "repo": "EH3D-AUTOLEVEL",
   "ecosystem": "eh3d",
   "tagline": "A G-code program that follows the table.",
-  "description": "EH3D-AUTOLEVEL is a Rust library and command line that rewrite a G-code program with the height map of the table of EH3D-COMMON, so that the Z follows the surface. It has no window yet.",
+  "description": "EH3D-AUTOLEVEL is a Rust library and command line that rewrite a G-code program with the height map of the table of EH3D-COMMON, so that the Z follows the surface. Built with the gui feature it also has a window (egui) that opens a program and a height map, shows the table as a coloured mesh with the levelled paths and exports.",
   "columns": [
     "WHO USES IT",
     "THIS REPOSITORY",
@@ -56,6 +56,23 @@
       ]
     },
     {
+      "id": "window",
+      "column": 1,
+      "level": "untested",
+      "title": "window (gui feature)",
+      "lines": [
+        "state, zoom and words are tested;",
+        "the drawing is not seen yet"
+      ],
+      "code": [
+        "src/window.rs::pub struct Window",
+        "src/viewport.rs::pub struct Viewport",
+        "src/lang.rs::pub enum Lang",
+        "src/browse.rs::pub struct Browser",
+        "src/gui.rs::pub fn run"
+      ]
+    },
+    {
       "id": "map",
       "column": 2,
       "level": "external",
@@ -106,12 +123,19 @@
       "from": "gcode",
       "to": "probe",
       "level": "tested"
+    },
+    {
+      "from": "person",
+      "to": "window",
+      "label": "window",
+      "level": "untested"
     }
   ],
   "legend": {
-    "tested": "covered by tests on a computer (68 tests)",
+    "tested": "covered by tests on a computer (124 tests)",
     "config": "planned, not used today",
-    "external": "a person, a file or another repository"
+    "external": "a person, a file or another repository",
+    "untested": "written, not built or looked at on a screen yet"
   },
   "footer": "Nothing here has corrected a real board yet."
 }

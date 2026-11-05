@@ -17,7 +17,7 @@
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 68 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Non ha ancora una finestra, non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
+**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 124 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.0.5` |
 | Maturità | Impalcatura |
-| Test | 68 |
+| Test | 124 |
 | Stack tecnologico | Rust |
 | Su hardware reale | Non provato: nulla di questo ha girato su una macchina |
 
@@ -46,9 +46,9 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 |---|---|---|
 | Nucleo | 🟡 | corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie; provato su un computer con input normali e danneggiati, non con una raccolta di file reali. |
 | Riga di comando | 🟡 | `eh3d-autolevel` esegue le stesse funzioni della libreria e stampa il risultato; ogni errore torna come messaggio e codice di uscita diverso da zero. |
-| Test | 🟡 | 68 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. |
+| Test | 🟡 | 124 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. |
 | Sicurezza | 🟡 | Rust sicuro e semplice (`forbid(unsafe_code)`): nulla va in panico con i file ricevuti e un valore errato è un errore con il suo motivo; nessuna revisione indipendente. |
-| Finestra | 🔴 | Previsto: la finestra egui comune alla suite; oggi esiste solo la riga di comando. |
+| Finestra | 🟠 | Scritta (egui, `--features gui`): aprire o trascinare un programma e una mappa delle altezze, simulare un piano, vedere il piano come maglia colorata e i percorsi livellati, zoom e spostamento, regolare il livellamento, esportare; la sua logica è testata, ma non è ancora stata compilata né vista su uno schermo. |
 | Hardware reale | 🔴 | Non provato: nulla di questo è stato eseguito su una macchina. |
 | Documentazione | 🟡 | README in otto lingue, il changelog e le due immagini disegnate da `docs/`. |
 
@@ -64,7 +64,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 
 ## 🧩 Ruolo in EH3D
 
-EH3D-AUTOLEVEL è un programma della EH3D Fabrication Suite. Oggi funziona come libreria e riga di comando; la sua finestra, con l'aspetto comune agli altri programmi della suite, è prevista. Legge e scrive file semplici, quindi può essere usato da solo o tra gli altri programmi.
+EH3D-AUTOLEVEL è un programma della EH3D Fabrication Suite. Funziona come libreria e riga di comando e, compilato con `--features gui`, come finestra con l'aspetto comune agli altri programmi della suite. Legge e scrive file semplici, quindi può essere usato da solo o tra gli altri programmi.
 
 ## 🏛️ Architettura
 
@@ -98,33 +98,10 @@ Come si incastrano le parti di questo repository: chi lo usa, cosa contiene e da
 La libreria è `eh3d_autolevel` (`use eh3d_autolevel::...`); la riga di comando è `eh3d-autolevel`. I comandi sono questi; ciascuno stampa il risultato sull'output standard e segnala un errore sull'output di errore con un codice di uscita diverso da zero. Non c'è accesso alla rete.
 
 ```text
-EH3D-AUTOLEVEL/
-├── src/
-│   ├── lib.rs                                   la libreria: ciò che usa ogni comando
-│   ├── main.rs                                  la riga di comando
-│   ├── cli_args.rs                              gli argomenti della riga di comando, lo stesso file in ogni piccola utilità
-│   ├── gcode.rs                                 una parte della logica
-│   └── surface.rs                               una parte della logica
-├── tests/
-│   ├── autolevel.rs                             test della libreria e della riga di comando
-│   ├── dry_run.rs                               test di --dry-run: conta lo stesso e non scrive nulla
-│   ├── readme.rs                                test che eseguono ciò che promettono il README e gli script run
-│   └── strict.rs                                test del contrassegno di un programma livellato e della riga di comando rigorosa
-├── examples/
-│   ├── sample.nc                                un esempio per provare il programma
-│   └── table.txt                                un esempio per provare il programma
-├── docs/
-│   ├── architecture.json                        dati dell'immagine di Architettura
-│   └── structure.json                           dati dell'immagine di Struttura
-├── tools/                                       controllo della CI e del README e strumenti per le immagini
-├── images/                                      banner e le immagini di Architettura e Struttura del repository
-├── .github/                                     workflow di CI e di rilascio, modelli di issue e pull request
-├── eh3d.project.json                            manifesto: versione, ruolo, maturità e comando di compilazione
-├── Cargo.toml Cargo.lock                        il workspace e le sue dipendenze bloccate
-├── rust-toolchain.toml                          la toolchain Rust fissata
-├── CHANGELOG.md                                 cosa è cambiato in ogni versione
-├── SECURITY.md SUPPORT.md                       come segnalare una vulnerabilità e dove chiedere
-└── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   come contribuire, codice di condotta e licenza
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ Configurazione
@@ -133,17 +110,18 @@ Non c'è ancora un file di configurazione: ciò che la persona sceglie si passa 
 
 ## 🚀 Avvio rapido
 
-Serve una toolchain Rust stabile (1.75 o più recente).
+Serve una toolchain Rust stabile (1.88 o più recente).
 
 ```bash
 cargo build --release
 cargo test
 cargo run --release -- info examples/table.txt
+cargo run --release --features gui   # the window
 ```
 
 ## 🧪 Test
 
-La suite ha 68 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
+La suite ha 124 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilazione e rilascio
 
@@ -165,12 +143,18 @@ EH3D-AUTOLEVEL/
 │   ├── main.rs                                  la riga di comando
 │   ├── cli_args.rs                              gli argomenti della riga di comando, lo stesso file in ogni piccola utilità
 │   ├── gcode.rs                                 una parte della logica
-│   └── surface.rs                               una parte della logica
+│   ├── surface.rs                               una parte della logica
+│   ├── browse.rs                                l'elenco dei file della finestra che apre un file
+│   ├── gui.rs                                   la finestra (egui, con la funzione gui): disegna lo stato e inoltra ciò che fa la persona
+│   ├── lang.rs                                  le parole della finestra nelle otto lingue
+│   ├── viewport.rs                              zoom e spostamento dell'immagine, in semplici numeri
+│   └── window.rs                                lo stato della finestra senza schermo: programma, mappa, impostazioni ed esportazione
 ├── tests/
 │   ├── autolevel.rs                             test della libreria e della riga di comando
 │   ├── dry_run.rs                               test di --dry-run: conta lo stesso e non scrive nulla
 │   ├── readme.rs                                test che eseguono ciò che promettono il README e gli script run
-│   └── strict.rs                                test del contrassegno di un programma livellato e della riga di comando rigorosa
+│   ├── strict.rs                                test del contrassegno di un programma livellato e della riga di comando rigorosa
+│   └── window_cli.rs                            test che una compilazione senza la funzione gui resti una riga di comando
 ├── examples/
 │   ├── sample.nc                                un esempio per provare il programma
 │   └── table.txt                                un esempio per provare il programma
@@ -194,14 +178,14 @@ EH3D-AUTOLEVEL/
 
 **Limiti noti oggi**
 
-* Non ha ancora una finestra: esistono solo la libreria e la riga di comando.
+* La finestra non è ancora stata vista su uno schermo e non può misurare un piano: la mappa si apre da un file o si simula.
 * Non è stato provato su una macchina né con una raccolta di file reali e non ha avuto revisione indipendente.
 * Gli archi sono rifiutati invece di essere spezzati, si presume che il programma inizi a X0 Y0 Z0 e la mappa viene dalla sonda della suite o da un piano simulato, non da una misura reale.
 
 **Prossimi passi**
 
 * Spezzare gli archi, prendere la posizione iniziale dalla macchina e correggere il programma durante l'invio, non prima.
-* Aggiungere la finestra con l'aspetto comune ai programmi della suite, negli otto idiomi.
+* Vedere la finestra su uno schermo e finirla.
 * Provarlo con file reali e con gli altri programmi della suite.
 
 ## 🌍 Lingue
