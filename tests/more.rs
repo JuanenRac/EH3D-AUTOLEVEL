@@ -153,7 +153,7 @@ fn the_percent_lines_of_a_postprocessor_are_kept_and_the_levelling_does_not_chan
     )
     .unwrap();
     assert!(out.starts_with("%\n") && out.ends_with("%\n"), "{out}");
-    assert!(out.contains("X30 Y20"));
+    assert!(out.contains("X30.000 Y20.000"));
 }
 
 #[test]

@@ -5,6 +5,7 @@
 mod cli_args;
 
 use cli_args::{finish, flag, num, switch};
+use eh3d_autolevel::config;
 use eh3d_autolevel::gcode::{correct, mark_with_header, Options};
 use eh3d_autolevel::surface::Method;
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
@@ -14,12 +15,14 @@ use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
 
-  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--config FILE] [--dry-run]
+  eh3d-autolevel config                            every setting with its default, as a file
   eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
   eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui): with no arguments, with files (a program, a map) or with gui it opens; the commands above never open it
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
+--decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file.
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
 
 fn load_map(path: &str) -> Result<HeightMap, String> {
@@ -51,6 +54,16 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
     match cmd.as_str() {
         "apply" => {
             let mut opts = Options::default();
+            if let Some(path) = flag(&mut args, "--config")? {
+                let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+                opts.decimals = config::parse(&text)
+                    .map_err(|e| format!("{path}: {e}"))?
+                    .decimals;
+            }
+            if let Some(d) = flag(&mut args, "--decimals")? {
+                opts.decimals =
+                    config::parse_decimals(&d).map_err(|e| format!("--decimals: {e}"))?;
+            }
             if let Some(s) = flag(&mut args, "--segment")? {
                 opts.max_segment_mm = num(&s, "--segment")?;
             }
@@ -122,6 +135,11 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 format!("{}: {e}", args[2])
             })?;
             println!("{summary}");
+            Ok(())
+        }
+        "config" => {
+            finish(&args, 0)?;
+            print!("{}", config::default_file());
             Ok(())
         }
         "info" => {

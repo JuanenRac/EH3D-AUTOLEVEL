@@ -5,6 +5,7 @@
 //! program that rewrites a G-code file so that the tool follows the table.
 
 pub mod browse;
+pub mod config;
 pub mod gcode;
 #[cfg(feature = "gui")]
 pub mod gui;

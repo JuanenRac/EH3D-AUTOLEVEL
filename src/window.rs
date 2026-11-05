@@ -457,6 +457,7 @@ impl Window {
             reference: (self.number(Key::RefX)?, self.number(Key::RefY)?),
             method: self.method,
             max_output_lines: self.whole(Key::MaxLines, 1.0, 100_000_000.0)?,
+            ..Options::default()
         })
     }
 

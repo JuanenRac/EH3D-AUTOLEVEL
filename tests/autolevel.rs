@@ -29,7 +29,7 @@ fn a_flat_table_changes_nothing_but_the_cutting_moves_are_cut_in_pieces() {
         &Options::default(),
     )
     .unwrap();
-    assert_eq!(out, "G90 G21\nG0 X0 Y0\nG1 X0 Y0 Z-0.1 F100\nG1 X1 Y0 Z-0.1\nG1 X2 Y0 Z-0.1\nG1 X3 Y0 Z-0.1\nM2\n");
+    assert_eq!(out, "G90 G21\nG0 X0.000 Y0.000\nG1 X0.000 Y0.000 Z-0.100 F100\nG1 X1.000 Y0.000 Z-0.100\nG1 X2.000 Y0.000 Z-0.100\nG1 X3.000 Y0.000 Z-0.100\nM2\n");
     assert_eq!((r.moves, r.pieces_added), (2, 2));
     assert_eq!((r.shift_min, r.shift_max), (0.0, 0.0));
 }
@@ -88,10 +88,10 @@ fn a_rapid_move_corrects_its_z_only_when_it_has_one() {
     )
     .unwrap();
     let lines: Vec<&str> = out.lines().collect();
-    assert_eq!(lines[0], "G0 X50 Y0");
+    assert_eq!(lines[0], "G0 X50.000 Y0.000");
     assert!((z_of(lines[1]) - 2.05).abs() < 1e-9, "{}", lines[1]);
     assert!(
-        lines[2].starts_with("G0 X10 Y10 Z1.01") && lines[2].ends_with("F500"),
+        lines[2].starts_with("G0 X10.000 Y10.000 Z1.01") && lines[2].ends_with("F500"),
         "{}",
         lines[2]
     );
@@ -110,7 +110,13 @@ fn the_words_that_are_not_a_move_travel_with_the_first_piece() {
     )
     .unwrap();
     let lines: Vec<&str> = out.lines().collect();
-    assert_eq!(lines, ["G1 X1 Y0 Z0 F200 S1000", "G1 X2 Y0 Z0"]);
+    assert_eq!(
+        lines,
+        [
+            "G1 X1.000 Y0.000 Z0.000 F200 S1000",
+            "G1 X2.000 Y0.000 Z0.000"
+        ]
+    );
 }
 
 #[test]
@@ -303,7 +309,7 @@ fn a_comment_that_names_a_forbidden_code_is_only_a_comment() {
         out.lines().next().unwrap(),
         "(use G91 and G20 later; G2 too)"
     );
-    assert!(out.contains("G1 X1 Y0 Z0"), "{out}");
+    assert!(out.contains("G1 X1.000 Y0.000 Z0.000"), "{out}");
     assert_eq!(r.moves, 1);
 }
 
@@ -345,8 +351,8 @@ fn a_move_is_cut_in_exactly_as_many_pieces_as_its_length_asks_for() {
         assert_eq!(r.pieces_added, pieces - 1);
         let last: Vec<&str> = out.lines().last().unwrap().split_whitespace().collect();
         assert_eq!(
-            last[1], "X10",
-            "the last piece ends at the target (to four decimals)"
+            last[1], "X10.000",
+            "the last piece ends at the target (to three decimals)"
         );
     }
 }
@@ -359,7 +365,10 @@ fn a_move_with_no_length_is_one_piece_and_a_plunge_keeps_the_position() {
         &Options::default(),
     )
     .unwrap();
-    assert_eq!(out, "G0 X20 Y30\nG1 X20 Y30 Z-1\nG1 X20 Y30 Z-1\n");
+    assert_eq!(
+        out,
+        "G0 X20.000 Y30.000\nG1 X20.000 Y30.000 Z-1.000\nG1 X20.000 Y30.000 Z-1.000\n"
+    );
     assert_eq!((r.moves, r.pieces_added), (2, 0));
 }
 
@@ -376,7 +385,7 @@ fn the_move_mode_stays_until_another_is_given_and_a_line_with_no_axis_is_left_al
     .unwrap();
     assert_eq!(
         out,
-        "G1 F100\nG1 X5 Y0 Z0\nG0\nG0 X9 Y0\nG1\nG1 X10 Y0 Z0\n"
+        "G1 F100\nG1 X5.000 Y0.000 Z0.000\nG0\nG0 X9.000 Y0.000\nG1\nG1 X10.000 Y0.000 Z0.000\n"
     );
 }
 
@@ -438,7 +447,7 @@ fn parameters_expressions_and_stray_characters_are_refused_with_the_line_not_gue
         },
     )
     .unwrap();
-    assert_eq!(out, "G1 X5 Y0 Z0\n");
+    assert_eq!(out, "G1 X5.000 Y0.000 Z0.000\n");
 }
 
 #[test]
@@ -452,7 +461,7 @@ fn numbers_may_have_a_sign_a_leading_dot_or_a_trailing_dot() {
         },
     )
     .unwrap();
-    assert_eq!(out, "G1 X5 Y0.5 Z-0.25\n");
+    assert_eq!(out, "G1 X5.000 Y0.500 Z-0.250\n");
 }
 
 #[test]
@@ -558,6 +567,6 @@ fn modal_g_words_on_a_move_line_are_kept() {
     )
     .unwrap();
     let mut lines = out.lines();
-    assert_eq!(lines.next().unwrap(), "G90 G54 G0 X10 Y10");
-    assert_eq!(lines.next().unwrap(), "G21 G1 X10 Y10 Z-0.1 F100");
+    assert_eq!(lines.next().unwrap(), "G90 G54 G0 X10.000 Y10.000");
+    assert_eq!(lines.next().unwrap(), "G21 G1 X10.000 Y10.000 Z-0.100 F100");
 }

@@ -17,6 +17,8 @@ pub struct Options {
     pub method: Method,
     /// The most lines the corrected program may have. A program that would pass it is refused before the pieces are made, so a tiny `max_segment_mm` cannot fill the memory.
     pub max_output_lines: usize,
+    /// How many decimals the coordinates X, Y and Z are written with (always that many, `X1.000`), from [`MIN_DECIMALS`] to [`MAX_DECIMALS`].
+    pub decimals: usize,
 }
 
 impl Default for Options {
@@ -26,6 +28,7 @@ impl Default for Options {
             reference: (0.0, 0.0),
             method: Method::Bilinear,
             max_output_lines: DEFAULT_MAX_OUTPUT_LINES,
+            decimals: DEFAULT_DECIMALS,
         }
     }
 }
@@ -45,6 +48,11 @@ const MAX_COORDINATE: f64 = 1.0e6;
 const MAX_PIECES: usize = 100_000;
 /// The default of [`Options::max_output_lines`].
 pub const DEFAULT_MAX_OUTPUT_LINES: usize = 5_000_000;
+/// The default of [`Options::decimals`].
+pub const DEFAULT_DECIMALS: usize = 3;
+/// The fewest and the most decimals a coordinate may be written with.
+pub const MIN_DECIMALS: usize = 1;
+pub const MAX_DECIMALS: usize = 6;
 
 /// The words of a line without its comments: `(...)` and everything after `;`.
 pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
@@ -114,6 +122,16 @@ fn fmt(v: f64) -> String {
     }
 }
 
+/// A coordinate with exactly `decimals` decimals; a value that rounds to zero is written without a sign.
+pub fn coord(v: f64, decimals: usize) -> String {
+    let s = format!("{v:.decimals$}");
+    if s.starts_with('-') && s[1..].chars().all(|c| c == '0' || c == '.') {
+        s[1..].to_string()
+    } else {
+        s
+    }
+}
+
 /// The start of the comment that marks a program as already levelled.
 pub const MARK: &str = "(eh3d-autolevel";
 
@@ -177,6 +195,13 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         return Err(format!("line {n}: this program was already levelled by eh3d-autolevel; level the original program, not its output"));
     }
     map.require_complete().map_err(|e| e.to_string())?;
+    if !(MIN_DECIMALS..=MAX_DECIMALS).contains(&opts.decimals) {
+        return Err(format!(
+            "decimals is {}: it must be a whole number from {MIN_DECIMALS} to {MAX_DECIMALS}",
+            opts.decimals
+        ));
+    }
+    let d = opts.decimals;
     if !(opts.max_segment_mm.is_finite() && opts.max_segment_mm > 0.0) {
         return Err(format!(
             "max_segment_mm is {}: it must be more than 0",
@@ -303,12 +328,12 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             let mut line = kept.clone();
             line.push("G0".to_string());
             for (l, v) in w.iter().filter(|(l, _)| matches!(l, 'X' | 'Y')) {
-                line.push(format!("{l}{}", fmt(*v)));
+                line.push(format!("{l}{}", coord(*v, d)));
             }
             if has_z {
                 let shift = at(target.0, target.1, n)? - zero;
                 track(shift);
-                line.push(format!("Z{}", fmt(target.2 + shift)));
+                line.push(format!("Z{}", coord(target.2 + shift, d)));
                 report.moves += 1;
             }
             line.extend(others);
@@ -333,7 +358,12 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 );
                 let shift = at(x, y, n)? - zero;
                 track(shift);
-                let mut line = format!("G1 X{} Y{} Z{}", fmt(x), fmt(y), fmt(z + shift));
+                let mut line = format!(
+                    "G1 X{} Y{} Z{}",
+                    coord(x, d),
+                    coord(y, d),
+                    coord(z + shift, d)
+                );
                 if k == 1 && !kept.is_empty() {
                     line = format!("{} {line}", kept.join(" "));
                 }
