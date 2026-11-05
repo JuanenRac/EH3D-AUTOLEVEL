@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The coordinates of the levelled program have three decimals:** X, Y and Z are always written with the same number of decimals (`G1 X1.000 Y0.000 Z-0.100`) instead of as many as were needed up to four; the other words (`F`, `S`, `M`...) are written as before.
+- **A settings file with the decimals:** `decimals` (3 by default, from 1 to 6) is read from a `key = value` file given with `--config FILE` or given on the command line with `--decimals N`, which wins over the file; `eh3d-autolevel config` prints the file with its defaults (`examples/autolevel.cfg`). A value that is not valid, a key that is not known or a key given twice is an error with the number of the line.
+
 ## [0.0.6] - The window with the height map, the standard header of the levelled program and the Windows icon
 
 - **Binaries for every system:** `release-binaries.yml` builds the program with its window for Windows (64 and 32 bits), Linux and macOS (Apple silicon and Intel), packs each one with the licence, the readme, the icon and the examples, writes `SHA256SUMS` and a build manifest, attests their provenance, verifies the artifact as a stranger would, prepares a draft release only after the owner approves it (a dry run is the default) and opens an issue `build-failed` when anything does not finish.

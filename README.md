@@ -17,7 +17,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 128 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 140 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.6` |
 | Maturity | Scaffolding |
-| Tests | 128 |
+| Tests | 140 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -46,7 +46,7 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 128 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
+| Tests | 🟡 | 140 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
 | Window | 🟠 | Written (egui, `--features gui`): open or drop a program and a height map, simulate a table, see the table as a coloured mesh and the levelled paths, zoom and pan, set the levelling, export; its logic is tested, but it has not been built or looked at on a screen yet. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
@@ -99,7 +99,8 @@ How the parts of this repository fit together: who uses it, what it holds and wh
 The library is `eh3d_autolevel` (`use eh3d_autolevel::...`); the command line is `eh3d-autolevel`. The commands are these; each prints its result on the standard output and reports an error on the standard error with a non-zero exit code. There is no network access.
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--config FILE] [--dry-run]
+eh3d-autolevel config                            every setting with its default, as a file
 eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
 eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
 eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
@@ -107,7 +108,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configuration
 
-There is no configuration file yet: what a person chooses is given as arguments of the command line (see Interfaces) and every default is written in the help of the command (`eh3d-autolevel help`). The fixed limits live in the code as named constants and are covered by tests.
+A small settings file (`key = value`, one per line, `#` starts a comment) holds what is worth tuning; today it has one key, `decimals`: how many decimals X, Y and Z are written with in the levelled program (3 by default, from 1 to 6). `eh3d-autolevel config` prints the file with every default (`examples/autolevel.cfg` is that file), `--config FILE` reads one and `--decimals N` gives the same key on the command line and wins over the file. A value that makes no sense is an error that says its line. The rest is given as arguments of the command line (see Interfaces) and every default is written in the help of the command (`eh3d-autolevel help`). The fixed limits live in the code as named constants and are covered by tests.
 
 ## 🚀 Quick start
 
@@ -122,7 +123,7 @@ cargo run --release --features gui   # the window
 
 ## 🧪 Testing
 
-The suite has 128 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 140 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 
@@ -147,6 +148,7 @@ EH3D-AUTOLEVEL/
 │   ├── lib.rs                                   the library: what every command uses
 │   ├── main.rs                                  the command line
 │   ├── cli_args.rs                              the arguments of the command line, the same file in every small utility
+│   ├── config.rs                                the settings file: the decimals of the coordinates of the levelled program
 │   ├── gcode.rs                                 a part of the logic
 │   ├── surface.rs                               a part of the logic
 │   ├── browse.rs                                the list of files of the window that opens a file
@@ -156,11 +158,13 @@ EH3D-AUTOLEVEL/
 │   └── window.rs                                the state of the window without a screen: program, map, settings and export
 ├── tests/
 │   ├── autolevel.rs                             tests of the library and the command line
+│   ├── decimals.rs                              tests of the decimals of the coordinates and of the settings file
 │   ├── dry_run.rs                               tests of --dry-run: it counts the same and writes nothing
 │   ├── readme.rs                                tests that run what the README and the run scripts promise
 │   ├── strict.rs                                tests of the mark of a levelled program and of the strict command line
 │   └── window_cli.rs                            tests that a build without the gui feature stays a command line
 ├── examples/
+│   ├── autolevel.cfg                            the settings file with every setting and its default
 │   ├── sample.nc                                a sample to try the program with
 │   └── table.txt                                a sample to try the program with
 ├── docs/

@@ -17,7 +17,7 @@
 
 ---
 
-**正直さの確認 - 現在実際に動くもの：** Rust ライブラリとコマンドライン プログラム（`eh3d-autolevel`）で、コンピューター上で実行される 128 件のテストがあります：テーブルの高さマップで G コード プログラムの Z を補正し、移動を表面に沿った短い区間に分割します。ウィンドウ（`--features gui` でビルド）はG コード プログラムと高さマップを開き、テーブルを色付きメッシュで表示してその上に補正後のパスを重ね、書き出すが、画面ではまだ確認しておらず、機械では試しておらず、実際のファイルの集まりでも確認していません。
+**正直さの確認 - 現在実際に動くもの：** Rust ライブラリとコマンドライン プログラム（`eh3d-autolevel`）で、コンピューター上で実行される 140 件のテストがあります：テーブルの高さマップで G コード プログラムの Z を補正し、移動を表面に沿った短い区間に分割します。ウィンドウ（`--features gui` でビルド）はG コード プログラムと高さマップを開き、テーブルを色付きメッシュで表示してその上に補正後のパスを重ね、書き出すが、画面ではまだ確認しておらず、機械では試しておらず、実際のファイルの集まりでも確認していません。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | バージョン | `0.0.6` |
 | 成熟度 | 足場 |
-| テスト | 128 |
+| テスト | 140 |
 | 技術スタック | Rust |
 | 実機での動作 | 未試験：ここにあるものは機械で動かしたことがありません |
 
@@ -46,7 +46,7 @@
 |---|---|---|
 | コア | 🟡 | テーブルの高さマップで G コード プログラムの Z を補正し、移動を表面に沿った短い区間に分割します。コンピューター上で通常入力と破損入力でテスト済み。実際のファイルの集まりでは未確認。 |
 | コマンドライン | 🟡 | `eh3d-autolevel` はライブラリと同じ関数を実行して結果を表示します。エラーはメッセージと 0 以外の終了コードで返ります。 |
-| テスト | 🟡 | 128 件のテストが通ります（`cargo test`）。通常ケース、境界ケース、破損入力を含みます。 |
+| テスト | 🟡 | 140 件のテストが通ります（`cargo test`）。通常ケース、境界ケース、破損入力を含みます。 |
 | セキュリティ | 🟡 | 安全な Rust のみ（`forbid(unsafe_code)`）。受け取ったファイルでパニックせず、不正な値は理由付きのエラーになります。独立したレビューはありません。 |
 | ウィンドウ | 🟠 | 作成済み（egui、`--features gui`）：プログラムと高さマップを開くかドロップ、テーブルのシミュレート、色付きメッシュのテーブルと補正後のパスの表示、拡大縮小と移動、補正の設定、書き出し。ロジックはテスト済みですが、まだビルドも画面での確認もしていません。 |
 | 実機 | 🔴 | 未試験：ここにあるものは機械で実行したことがありません。 |
@@ -99,7 +99,8 @@ EH3D-AUTOLEVEL は EH3D Fabrication Suite のプログラムの一つです。�
 ライブラリは `eh3d_autolevel`（`use eh3d_autolevel::...`）、コマンドラインは `eh3d-autolevel` です。コマンドは次のとおりで、結果は標準出力に表示され、エラーは標準エラー出力に 0 以外の終了コードで報告されます。ネットワークアクセスはありません。
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--config FILE] [--dry-run]
+eh3d-autolevel config                            every setting with its default, as a file
 eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
 eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
 eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
@@ -107,7 +108,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ 設定
 
-設定ファイルはまだありません。選択は（インターフェースを参照）コマンドラインの引数で渡し、各既定値はコマンドのヘルプ（`eh3d-autolevel help`）に書かれています。固定の上限はコード内の名前付き定数で、テストで確認されています。
+調整する価値のある値は小さな設定ファイル（`キー = 値`、1行に1つ、`#` からコメント）に置きます。現在のキーは `decimals` の1つで、補正後プログラムの X、Y、Z を何桁の小数で書くかを決めます（既定は3、1〜6）。`eh3d-autolevel config` はすべての既定値を含むファイルを出力し（`examples/autolevel.cfg` がそのファイルです）、`--config FILE` はファイルを読み、`--decimals N` は同じキーをコマンドラインで与えてファイルより優先されます。意味のない値は、その行番号を示すエラーになります。それ以外はコマンドラインの引数で渡し（インターフェースを参照）、各既定値はコマンドのヘルプ（`eh3d-autolevel help`）に書かれています。固定の上限はコード内の名前付き定数で、テストで確認されています。
 
 ## 🚀 クイックスタート
 
@@ -122,7 +123,7 @@ cargo run --release --features gui   # the window
 
 ## 🧪 テスト
 
-テストは 128 件あります（`cargo test`、CI では Windows と Linux で実行）。通常ケース、境界ケース、破損入力を確認し、空のファイル、ゴミデータ、途中で切れたファイルでもパニックしません。CI は `cargo fmt --check`、警告をエラーにした `cargo clippy`、`python -I tools/ci_validate.py` も実行します。
+テストは 140 件あります（`cargo test`、CI では Windows と Linux で実行）。通常ケース、境界ケース、破損入力を確認し、空のファイル、ゴミデータ、途中で切れたファイルでもパニックしません。CI は `cargo fmt --check`、警告をエラーにした `cargo clippy`、`python -I tools/ci_validate.py` も実行します。
 
 ## 🏗️ ビルドとリリース
 
@@ -147,6 +148,7 @@ EH3D-AUTOLEVEL/
 │   ├── lib.rs                                   ライブラリ：各コマンドが使うもの
 │   ├── main.rs                                  コマンドライン
 │   ├── cli_args.rs                              コマンドライン引数：小さなツールすべてで同じファイル
+│   ├── config.rs                                設定ファイル：補正後プログラムの座標の小数桁数
 │   ├── gcode.rs                                 ロジックの一部
 │   ├── surface.rs                               ロジックの一部
 │   ├── browse.rs                                ファイルを開くウィンドウのファイル一覧
@@ -156,11 +158,13 @@ EH3D-AUTOLEVEL/
 │   └── window.rs                                画面なしのウィンドウの状態：プログラム、マップ、設定、書き出し
 ├── tests/
 │   ├── autolevel.rs                             ライブラリとコマンドラインのテスト
+│   ├── decimals.rs                              座標の小数桁数と設定ファイルのテスト
 │   ├── dry_run.rs                               --dry-runのテスト：同じ数を数え、何も書かない
 │   ├── readme.rs                                READMEとrunスクリプトが約束する内容を実行するテスト
 │   ├── strict.rs                                補正済みプログラムの印と厳密なコマンドラインのテスト
 │   └── window_cli.rs                            gui 機能なしのビルドがコマンドラインのままであることのテスト
 ├── examples/
+│   ├── autolevel.cfg                            すべての設定と既定値を載せた設定ファイル
 │   ├── sample.nc                                試すためのサンプル
 │   └── table.txt                                試すためのサンプル
 ├── docs/
