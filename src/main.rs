@@ -5,7 +5,7 @@
 mod cli_args;
 
 use cli_args::{finish, flag, num, switch};
-use eh3d_autolevel::gcode::{correct, mark, Options};
+use eh3d_autolevel::gcode::{correct, mark_with_header, Options};
 use eh3d_autolevel::surface::Method;
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
 use std::env;
@@ -101,12 +101,26 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             }
             // written beside and renamed, so that a program levelled in place is never left half written
             let tmp = format!("{}.tmp", args[2]);
-            fs::write(&tmp, mark(&out, &map, &opts))
-                .and_then(|()| fs::rename(&tmp, &args[2]))
-                .map_err(|e| {
-                    let _ = fs::remove_file(&tmp);
-                    format!("{}: {e}", args[2])
-                })?;
+            fs::write(
+                &tmp,
+                mark_with_header(
+                    &out,
+                    &map,
+                    &opts,
+                    Some((
+                        std::path::Path::new(&args[1])
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("program"),
+                        text.as_str(),
+                    )),
+                ),
+            )
+            .and_then(|()| fs::rename(&tmp, &args[2]))
+            .map_err(|e| {
+                let _ = fs::remove_file(&tmp);
+                format!("{}: {e}", args[2])
+            })?;
             println!("{summary}");
             Ok(())
         }

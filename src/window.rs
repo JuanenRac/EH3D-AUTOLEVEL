@@ -1,8 +1,8 @@
 //! The state of the window without a screen: the program and the height map that are open, the settings, the levelled program, the paths and colours to draw, the files to write and the
 //! status line. The window (`gui`) only draws this and passes on what the person does, so everything that can be decided is decided here, in code that is tested. The program is levelled
-//! with `gcode::correct` and written with `gcode::mark`, the same functions as the command line.
+//! with `gcode::correct` and written with `gcode::mark_with_header`, the same functions as the command line.
 
-use crate::gcode::{correct, mark, words, Options, Report, DEFAULT_MAX_OUTPUT_LINES};
+use crate::gcode::{correct, mark_with_header, words, Options, Report, DEFAULT_MAX_OUTPUT_LINES};
 use crate::lang::{fill, Lang, Msg};
 use crate::surface::{height, Method};
 use crate::viewport::Viewport;
@@ -689,7 +689,16 @@ impl Window {
             self.status = Status::SameFile(path.display().to_string());
             return false;
         }
-        let text = mark(&done.text, &file.map, &done.options);
+        let source = self
+            .program
+            .as_ref()
+            .map(|p| (name_of(&p.path), p.text.as_str()));
+        let text = mark_with_header(
+            &done.text,
+            &file.map,
+            &done.options,
+            source.as_ref().map(|(n, t)| (n.as_str(), *t)),
+        );
         match write_atomic(path, &text) {
             Ok(()) => {
                 self.status = Status::Written(name_of(path));
@@ -1093,7 +1102,9 @@ mod tests {
         let out = s.0.join("job_levelled.nc");
         assert!(w.export_program(&out));
         let text = fs::read_to_string(&out).unwrap();
-        assert!(text.starts_with("(eh3d-autolevel"));
+        assert!(text.starts_with("; generator: eh3d-autolevel "), "{text}");
+        assert!(text.contains("\n(eh3d-autolevel"), "{text}");
+        assert!(text.contains("; source: job.nc sha256:"), "{text}");
         assert!(!s.0.join("job_levelled.nc.tmp").exists());
         let mut again = Window::new(Lang::En);
         assert!(again.open_program(&out));

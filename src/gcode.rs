@@ -6,6 +6,7 @@
 
 use crate::surface::{height, Method};
 use eh3d_levelling::HeightMap;
+use eh3d_parser_gcode::emit::{header, sha256_hex, Header};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Options {
@@ -145,6 +146,29 @@ pub fn mark(program: &str, map: &HeightMap, opts: &Options) -> String {
         }
     }
     format!("{line}{program}")
+}
+
+/// Like [`mark`] and with the standard header of the suite in front of the mark: the generator and its version, the units, the program the work came from (its name and the SHA-256
+/// of its text) and the tools. The header is comment lines, so the program is the same for a controller. It goes after the `%` that opens a program, like the mark.
+pub fn mark_with_header(
+    program: &str,
+    map: &HeightMap,
+    opts: &Options,
+    source: Option<(&str, &str)>,
+) -> String {
+    let marked = mark(program, map, opts);
+    let head = header(&Header {
+        generator: "eh3d-autolevel",
+        version: env!("CARGO_PKG_VERSION"),
+        source: source.map(|(name, text)| (name, sha256_hex(text.as_bytes()))),
+        tools: "as in the original program",
+    });
+    for lead in ["%\r\n", "%\n"] {
+        if let Some(rest) = marked.strip_prefix(lead) {
+            return format!("{lead}{head}{rest}");
+        }
+    }
+    format!("{head}{marked}")
 }
 
 /// Corrects `text` with `map`. The map must be complete. A program that already carries the mark of a levelled one is refused: its Z is already corrected.

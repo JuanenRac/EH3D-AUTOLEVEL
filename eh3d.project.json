@@ -18,7 +18,8 @@
   "family": "CNC Workflow Tools",
   "parent": null,
   "depends_on": [
-    "EH3D-COMMON"
+    "EH3D-COMMON",
+    "EH3D-CORE-LIBS"
   ],
   "build": "cargo build --release; cargo test",
   "notes": "Scaffolding v0.0.5: a library and a command line that rewrite a G-code program (absolute millimetres, straight moves) with the height map of the table of EH3D-COMMON: cutting moves are cut in pieces that follow the surface, bilinear or bicubic, and arcs, G91 and G20 are refused with their line. A window (egui, built with the gui feature: open a program and a map, see the table as a coloured mesh and the levelled paths, export) is written and its logic is tested, but it has not been looked at on a screen; the map comes from the probe of the suite or from a simulated table; nothing has been tried on a machine.",

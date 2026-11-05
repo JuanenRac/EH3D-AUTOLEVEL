@@ -99,9 +99,12 @@ fn the_command_line_refuses_options_and_words_it_does_not_know() {
     // what is right still works, writes the mark, and its output cannot be levelled again
     let (ok, e) = run(&["apply", &map, &prog, &out, "--segment", "2"]);
     assert!(ok, "{e}");
-    assert!(std::fs::read_to_string(&out)
-        .unwrap()
-        .starts_with("(eh3d-autolevel "));
+    let written = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        written.starts_with("; generator: eh3d-autolevel "),
+        "{written}"
+    );
+    assert!(written.contains("\n(eh3d-autolevel "), "{written}");
     let again = format!("{dir}/strict-again.nc");
     let (ok, e) = run(&["apply", &map, &out, &again]);
     assert!(!ok && e.contains("already levelled"), "{e}");
@@ -246,7 +249,8 @@ fn the_command_line_can_level_a_file_in_place_once_and_then_refuses_it() {
     let (c, _, e) = code(&["apply", &map, &prog, &prog]);
     assert_eq!(c, Some(0), "{e}");
     let first = std::fs::read_to_string(&prog).unwrap();
-    assert!(first.starts_with("(eh3d-autolevel "));
+    assert!(first.starts_with("; generator: eh3d-autolevel "), "{first}");
+    assert!(first.contains("\n(eh3d-autolevel "), "{first}");
     let (c, _, e) = code(&["apply", &map, &prog, &prog]);
     assert_eq!(c, Some(1));
     assert!(e.contains("already levelled"), "{e}");

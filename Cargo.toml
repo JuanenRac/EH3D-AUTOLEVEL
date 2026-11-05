@@ -24,6 +24,8 @@ gui = ["dep:eframe", "dep:png"]
 [dependencies]
 # the height map of the table (a path dependency on the sibling repository)
 eh3d-levelling = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/levelling" }
+# the one way a number and the header of a G-code file are written in the suite, and the reader that the tests walk the output with
+eh3d-parser-gcode = { version = ">=0.0.2", path = "../EH3D-CORE-LIBS/crates/eh3d-parser-gcode" }
 
 # the window
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"], optional = true }
