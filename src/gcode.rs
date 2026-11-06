@@ -2,7 +2,10 @@
 //! `max_segment_mm` and each piece gets the Z that the map gives for its end; a rapid move (G0) only has the Z corrected at its end when it has a Z word.
 //!
 //! What is supported: absolute millimetres (G90, G21) and straight moves (G0, G1). What is refused, with the number of the line: relative distances (G91), inches (G20), arcs (G2, G3)
-//! and a move before any G0 or G1. The program is assumed to start at X0 Y0 Z0. Outside the grid the height of the nearest edge is used.
+//! and a move before any G0 or G1. The program is assumed to start at X0 Y0 Z0 A0 B0 C0. Outside the grid the height of the nearest edge is used.
+//!
+//! The rotary axes A, B and C are modal like the others: when a cutting move is cut in pieces their words are interpolated in a straight line between the value they had and the value
+//! the move gives, as X and Y are, and written with the same decimals; the height of the table comes from X and Y only. A program with no A, B or C is written as it always was.
 
 use crate::surface::{height, Method};
 use eh3d_levelling::HeightMap;
@@ -44,10 +47,14 @@ pub struct Report {
     pub shift_max: f64,
 }
 
+/// The rotary axes, in the order they are written.
+const ROTARY: [char; 3] = ['A', 'B', 'C'];
 const MAX_COORDINATE: f64 = 1.0e6;
 const MAX_PIECES: usize = 100_000;
 /// The default of [`Options::max_output_lines`].
 pub const DEFAULT_MAX_OUTPUT_LINES: usize = 5_000_000;
+/// The most lines the limit of the output may be set to.
+pub const MAX_OUTPUT_LINES_LIMIT: usize = 100_000_000;
 /// The default of [`Options::decimals`].
 pub const DEFAULT_DECIMALS: usize = 3;
 /// The fewest and the most decimals a coordinate may be written with.
@@ -222,6 +229,8 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
     };
     let mut mode: Option<u32> = None;
     let mut pos = (0.0, 0.0, 0.0);
+    // where A, B and C stand (the program is assumed to start at 0), followed from line to line
+    let mut rot = [0.0_f64; 3];
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
         // the '%' that some postprocessors put at the start and at the end of the program is not a word
@@ -320,6 +329,17 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             )
         };
         let has_z = w.iter().any(|(l, _)| *l == 'Z');
+        // the rotary axes this line moves: (letter, where it stands, where it goes)
+        let rotary: Vec<(char, f64, f64)> = ROTARY
+            .iter()
+            .enumerate()
+            .filter_map(|(k, &c)| {
+                w.iter()
+                    .rev()
+                    .find(|(l, _)| *l == c)
+                    .map(|(_, v)| (c, rot[k], *v))
+            })
+            .collect();
         let mut track = |shift: f64| {
             report.shift_min = report.shift_min.min(shift);
             report.shift_max = report.shift_max.max(shift);
@@ -349,6 +369,15 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             if i + report.pieces_added + pieces > opts.max_output_lines {
                 return Err(format!("line {n}: the corrected program would have more than {} lines; use a longer piece (--segment) or raise the limit (--max-lines)", opts.max_output_lines));
             }
+            // a move that is cut in pieces writes the rotary words itself; a move in one piece keeps its words as they are
+            let others: Vec<String> = if pieces > 1 && !rotary.is_empty() {
+                w.iter()
+                    .filter(|(l, _)| !matches!(l, 'G' | 'X' | 'Y' | 'Z' | 'M' | 'A' | 'B' | 'C'))
+                    .map(|&(l, v)| format!("{l}{}", fmt(v)))
+                    .collect()
+            } else {
+                others
+            };
             for k in 1..=pieces {
                 let t = k as f64 / pieces as f64;
                 let (x, y, z) = (
@@ -364,6 +393,17 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     coord(y, d),
                     coord(z + shift, d)
                 );
+                if pieces > 1 {
+                    for &(c, from, to) in &rotary {
+                        // the last piece ends exactly where the move says
+                        let v = if k == pieces {
+                            to
+                        } else {
+                            from + (to - from) * t
+                        };
+                        line.push_str(&format!(" {c}{}", coord(v, d)));
+                    }
+                }
                 if k == 1 && !kept.is_empty() {
                     line = format!("{} {line}", kept.join(" "));
                 }
@@ -382,6 +422,11 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             report.pieces_added += pieces - 1;
         }
         pos = target;
+        for &(c, _, to) in &rotary {
+            if let Some(k) = ROTARY.iter().position(|&r| r == c) {
+                rot[k] = to;
+            }
+        }
     }
     if report.moves == 0 {
         report.shift_min = 0.0;

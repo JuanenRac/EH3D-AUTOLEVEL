@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The rotary axes A, B and C are interpolated:** when a cutting move (G1) is cut in pieces, its `A`, `B` and `C` words go in a straight line from the value they had to the one the move gives, like X and Y, written with the configured decimals; the last piece ends exactly on the target and the Z of the table still comes from X and Y only. The axes are modal (a move with no `A` writes none, a line with only rotary words or a rapid move sets where they stand) and start at 0. A move that is not cut keeps its words as they were written, and a program with no A, B or C is written exactly as before.
+- **`max-lines` in the settings file:** the most lines the levelled program may have (5000000 by default, from 1 to 100000000), a new strict key with the error of its line (not known, not valid, given twice); `--max-lines` on the command line wins over the file and `eh3d-autolevel config` prints it with the rest.
+
 ## [0.0.6] - The window with the height map, the standard header of the levelled program and the Windows icon
 
 - **The coordinates of the levelled program have three decimals:** X, Y and Z are always written with the same number of decimals (`G1 X1.000 Y0.000 Z-0.100`) instead of as many as were needed up to four; the other words (`F`, `S`, `M`...) are written as before.

@@ -22,7 +22,8 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
   eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui): with no arguments, with files (a program, a map) or with gui it opens; the commands above never open it
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
---decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file.
+--decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
+A, B and C are interpolated like X and Y when a cutting move is cut in pieces.
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
 
 fn load_map(path: &str) -> Result<HeightMap, String> {
@@ -56,9 +57,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             let mut opts = Options::default();
             if let Some(path) = flag(&mut args, "--config")? {
                 let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
-                opts.decimals = config::parse(&text)
-                    .map_err(|e| format!("{path}: {e}"))?
-                    .decimals;
+                let settings = config::parse(&text).map_err(|e| format!("{path}: {e}"))?;
+                opts.decimals = settings.decimals;
+                opts.max_output_lines = settings.max_lines;
             }
             if let Some(d) = flag(&mut args, "--decimals")? {
                 opts.decimals =

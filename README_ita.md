@@ -17,7 +17,7 @@
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 140 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
+**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 148 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.0.6` |
 | Maturità | Impalcatura |
-| Test | 140 |
+| Test | 148 |
 | Stack tecnologico | Rust |
 | Su hardware reale | Non provato: nulla di questo ha girato su una macchina |
 
@@ -46,7 +46,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 |---|---|---|
 | Nucleo | 🟡 | corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie; provato su un computer con input normali e danneggiati, non con una raccolta di file reali. |
 | Riga di comando | 🟡 | `eh3d-autolevel` esegue le stesse funzioni della libreria e stampa il risultato; ogni errore torna come messaggio e codice di uscita diverso da zero. |
-| Test | 🟡 | 140 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. |
+| Test | 🟡 | 148 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. |
 | Sicurezza | 🟡 | Rust sicuro e semplice (`forbid(unsafe_code)`): nulla va in panico con i file ricevuti e un valore errato è un errore con il suo motivo; nessuna revisione indipendente. |
 | Finestra | 🟠 | Scritta (egui, `--features gui`): aprire o trascinare un programma e una mappa delle altezze, simulare un piano, vedere il piano come maglia colorata e i percorsi livellati, zoom e spostamento, regolare il livellamento, esportare; la sua logica è testata, ma non è ancora stata compilata né vista su uno schermo. |
 | Hardware reale | 🔴 | Non provato: nulla di questo è stato eseguito su una macchina. |
@@ -82,6 +82,7 @@ Come si incastrano le parti di questo repository: chi lo usa, cosa contiene e da
 * **Nessuna ipotesi:** un valore privo di senso è un errore che dice quale e perché, mai un risultato che sembra solo giusto.
 * **Nessun codice unsafe:** `#![forbid(unsafe_code)]` nella libreria e nel programma.
 * **Le righe che non sono movimenti passano così come sono:** i comandi `$`, le assegnazioni `#` e i messaggi `M117` e `M118` sono scritti com'erano, il checksum di una riga numerata non è una parola, le parole `M` di un movimento suddiviso vanno con l'ultimo pezzo e `--max-lines` (5000000 per impostazione predefinita) rifiuta un programma con più righe di uscita.
+* **Gli assi rotanti A, B e C sono interpolati:** quando un movimento di taglio è diviso in pezzi, le sue parole `A`, `B` e `C` vanno in linea retta dal valore che avevano a quello del movimento (sono modali e partono da 0), con gli stessi decimali di X, Y e Z; l'ultimo pezzo finisce esattamente sulla destinazione e la Z del piano viene ancora solo da X e Y. Un programma senza parole rotanti è scritto come prima.
 * **Il programma livellato inizia con l'intestazione standard:** il generatore e la sua versione, le unità, il programma di origine con il suo SHA-256 e gli utensili, come righe di commento prima del segno; i test rileggono il risultato con il lettore della suite e non trovano alcun avviso, alcun movimento rapido nel materiale e alcun taglio con il mandrino fermo.
 
 ## 🔒 Sicurezza e protezione
@@ -108,7 +109,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configurazione
 
-Un piccolo file di impostazioni (`chiave = valore`, uno per riga, `#` inizia un commento) contiene ciò che vale la pena regolare; oggi ha una chiave, `decimals`: con quanti decimali si scrivono X, Y e Z nel programma livellato (3 per impostazione predefinita, da 1 a 6). `eh3d-autolevel config` stampa il file con ogni valore predefinito (`examples/autolevel.cfg` è quel file), `--config FILE` ne legge uno e `--decimals N` dà la stessa chiave sulla riga di comando e prevale sul file. Un valore senza senso è un errore che indica la sua riga. Il resto si passa come argomenti della riga di comando (vedi Interfacce) e ogni valore predefinito è scritto nella guida del comando (`eh3d-autolevel help`). I limiti fissi sono costanti con nome nel codice, coperte da test.
+Un piccolo file di impostazioni (`chiave = valore`, uno per riga, `#` inizia un commento) contiene ciò che vale la pena regolare; oggi ha due chiavi: `decimals`, con quanti decimali si scrivono X, Y e Z nel programma livellato (3 per impostazione predefinita, da 1 a 6), e `max-lines`, il massimo di righe del programma livellato (5000000 per impostazione predefinita, da 1 a 100000000). `eh3d-autolevel config` stampa il file con ogni valore predefinito (`examples/autolevel.cfg` è quel file), `--config FILE` ne legge uno e `--decimals N` e `--max-lines N` danno le stesse chiavi sulla riga di comando e prevalgono sul file. Un valore senza senso è un errore che indica la sua riga. Il resto si passa come argomenti della riga di comando (vedi Interfacce) e ogni valore predefinito è scritto nella guida del comando (`eh3d-autolevel help`). I limiti fissi sono costanti con nome nel codice, coperte da test.
 
 ## 🚀 Avvio rapido
 
@@ -123,7 +124,7 @@ cargo run --release --features gui   # the window
 
 ## 🧪 Test
 
-La suite ha 140 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
+La suite ha 148 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilazione e rilascio
 
@@ -148,7 +149,7 @@ EH3D-AUTOLEVEL/
 │   ├── lib.rs                                   la libreria: ciò che usa ogni comando
 │   ├── main.rs                                  la riga di comando
 │   ├── cli_args.rs                              gli argomenti della riga di comando, lo stesso file in ogni piccola utilità
-│   ├── config.rs                                il file delle impostazioni: i decimali delle coordinate del programma livellato
+│   ├── config.rs                                il file delle impostazioni: i decimali delle coordinate e il limite di righe del programma livellato
 │   ├── gcode.rs                                 una parte della logica
 │   ├── surface.rs                               una parte della logica
 │   ├── browse.rs                                l'elenco dei file della finestra che apre un file
@@ -160,6 +161,7 @@ EH3D-AUTOLEVEL/
 │   ├── autolevel.rs                             test della libreria e della riga di comando
 │   ├── decimals.rs                              test dei decimali delle coordinate e del file delle impostazioni
 │   ├── dry_run.rs                               test di --dry-run: conta lo stesso e non scrive nulla
+│   ├── rotary.rs                                test dell'interpolazione di A, B e C e del limite di righe del file delle impostazioni
 │   ├── readme.rs                                test che eseguono ciò che promettono il README e gli script run
 │   ├── strict.rs                                test del contrassegno di un programma livellato e della riga di comando rigorosa
 │   └── window_cli.rs                            test che una compilazione senza la funzione gui resti una riga di comando

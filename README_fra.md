@@ -17,7 +17,7 @@
 
 ---
 
-**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 140 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
+**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 148 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.6` |
 | Maturité | Échafaudage |
-| Tests | 140 |
+| Tests | 148 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non essayé : rien ici n'a fonctionné sur une machine |
 
@@ -46,7 +46,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 |---|---|---|
 | Cœur | 🟡 | corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface ; testé sur un ordinateur avec des entrées normales et abîmées, pas avec une collection de fichiers réels. |
 | Ligne de commande | 🟡 | `eh3d-autolevel` exécute les mêmes fonctions que la bibliothèque et affiche le résultat ; chaque erreur revient sous forme de message et de code de sortie non nul. |
-| Tests | 🟡 | 140 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. |
+| Tests | 🟡 | 148 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. |
 | Sécurité | 🟡 | Rust sûr et simple (`forbid(unsafe_code)`) : rien ne panique sur les fichiers reçus et une mauvaise valeur est une erreur avec sa raison ; pas de revue indépendante. |
 | Fenêtre | 🟠 | Écrite (egui, `--features gui`) : ouvrir ou déposer un programme et une carte de hauteurs, simuler une table, voir la table en maillage coloré et les trajets nivelés, zoom et déplacement, régler le nivellement, exporter ; sa logique est testée, mais elle n'a pas encore été compilée ni vue sur un écran. |
 | Matériel réel | 🔴 | Non essayé : rien ici n'a été exécuté sur une machine. |
@@ -82,6 +82,7 @@ Comment les parties de ce dépôt s'articulent : qui l'utilise, ce qu'il contien
 * **Sans deviner :** une valeur absurde est une erreur qui dit laquelle et pourquoi, jamais un résultat qui n'en a que l'air.
 * **Pas de code unsafe :** `#![forbid(unsafe_code)]` dans la bibliothèque et le programme.
 * **Les lignes qui ne sont pas des déplacements passent telles quelles :** les commandes `$`, les affectations `#` et les messages `M117` et `M118` sont écrits comme ils sont, la somme de contrôle d'une ligne numérotée n'est pas un mot, les mots `M` d'un déplacement découpé vont avec son dernier morceau, et `--max-lines` (5000000 par défaut) refuse un programme qui aurait plus de lignes de sortie.
+* **Les axes rotatifs A, B et C sont interpolés :** quand un déplacement de coupe est découpé en morceaux, ses mots `A`, `B` et `C` vont en ligne droite de la valeur qu'ils avaient à celle du déplacement (ils sont modaux et partent de 0), avec les mêmes décimales que X, Y et Z ; le dernier morceau finit exactement sur la cible, et le Z de la table vient toujours de X et Y seulement. Un programme sans mot rotatif est écrit comme avant.
 * **Le programme nivelé commence par l'en-tête standard :** le générateur et sa version, les unités, le programme d'origine avec son SHA-256 et les outils, en lignes de commentaire avant la marque ; les tests relisent le résultat avec le lecteur de la suite et ne trouvent ni avertissement, ni déplacement rapide dans la matière, ni coupe avec la broche arrêtée.
 
 ## 🔒 Sécurité et protection
@@ -108,7 +109,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configuration
 
-Un petit fichier de réglages (`clé = valeur`, un par ligne, `#` commence un commentaire) contient ce qui mérite d'être ajusté ; il a aujourd'hui une clé, `decimals` : le nombre de décimales avec lequel X, Y et Z sont écrits dans le programme nivelé (3 par défaut, de 1 à 6). `eh3d-autolevel config` affiche le fichier avec chaque valeur par défaut (`examples/autolevel.cfg` est ce fichier), `--config FICHIER` en lit un et `--decimals N` donne la même clé sur la ligne de commande et l'emporte sur le fichier. Une valeur absurde est une erreur qui indique sa ligne. Le reste est donné en arguments de la ligne de commande (voir Interfaces) et chaque valeur par défaut est écrite dans l'aide de la commande (`eh3d-autolevel help`). Les limites fixes sont des constantes nommées dans le code, couvertes par des tests.
+Un petit fichier de réglages (`clé = valeur`, un par ligne, `#` commence un commentaire) contient ce qui mérite d'être ajusté ; il a aujourd'hui deux clés : `decimals`, le nombre de décimales avec lequel X, Y et Z sont écrits dans le programme nivelé (3 par défaut, de 1 à 6), et `max-lines`, le nombre maximal de lignes du programme nivelé (5000000 par défaut, de 1 à 100000000). `eh3d-autolevel config` affiche le fichier avec chaque valeur par défaut (`examples/autolevel.cfg` est ce fichier), `--config FICHIER` en lit un et `--decimals N` et `--max-lines N` donnent les mêmes clés sur la ligne de commande et l'emportent sur le fichier. Une valeur absurde est une erreur qui indique sa ligne. Le reste est donné en arguments de la ligne de commande (voir Interfaces) et chaque valeur par défaut est écrite dans l'aide de la commande (`eh3d-autolevel help`). Les limites fixes sont des constantes nommées dans le code, couvertes par des tests.
 
 ## 🚀 Démarrage rapide
 
@@ -123,7 +124,7 @@ cargo run --release --features gui   # the window
 
 ## 🧪 Tests
 
-La suite compte 140 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
+La suite compte 148 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilation et publication
 
@@ -148,7 +149,7 @@ EH3D-AUTOLEVEL/
 │   ├── lib.rs                                   la bibliothèque : ce que chaque commande utilise
 │   ├── main.rs                                  la ligne de commande
 │   ├── cli_args.rs                              les arguments de la ligne de commande, le même fichier dans chaque petit utilitaire
-│   ├── config.rs                                le fichier de réglages : les décimales des coordonnées du programme nivelé
+│   ├── config.rs                                le fichier de réglages : les décimales des coordonnées et la limite de lignes du programme nivelé
 │   ├── gcode.rs                                 une partie de la logique
 │   ├── surface.rs                               une partie de la logique
 │   ├── browse.rs                                la liste des fichiers de la fenêtre d'ouverture d'un fichier
@@ -160,6 +161,7 @@ EH3D-AUTOLEVEL/
 │   ├── autolevel.rs                             tests de la bibliothèque et de la ligne de commande
 │   ├── decimals.rs                              tests des décimales des coordonnées et du fichier de réglages
 │   ├── dry_run.rs                               tests de --dry-run : compte la même chose et n'écrit rien
+│   ├── rotary.rs                                tests de l'interpolation de A, B et C et de la limite de lignes du fichier de réglages
 │   ├── readme.rs                                tests qui exécutent ce que promettent le README et les scripts run
 │   ├── strict.rs                                tests de la marque d'un programme nivelé et de la ligne de commande stricte
 │   └── window_cli.rs                            tests qu'une compilation sans la fonctionnalité gui reste une ligne de commande

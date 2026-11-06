@@ -17,7 +17,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 140 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 148 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.6` |
 | Maturity | Scaffolding |
-| Tests | 140 |
+| Tests | 148 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -46,7 +46,7 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 140 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
+| Tests | 🟡 | 148 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
 | Window | 🟠 | Written (egui, `--features gui`): open or drop a program and a height map, simulate a table, see the table as a coloured mesh and the levelled paths, zoom and pan, set the levelling, export; its logic is tested, but it has not been built or looked at on a screen yet. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
@@ -82,6 +82,7 @@ How the parts of this repository fit together: who uses it, what it holds and wh
 * **No guessing:** a value that does not make sense is an error that says which value and why, never a result that only looks right.
 * **No unsafe code:** `#![forbid(unsafe_code)]` in the library and the program.
 * **Lines that are not moves pass through:** `$` commands, `#` assignments and the messages `M117` and `M118` are written as they are, the checksum of a numbered line is not a word, the `M` words of a cut move go with its last piece, and `--max-lines` (5000000 by default) refuses a program that would have more output lines.
+* **The rotary axes A, B and C are interpolated:** when a cutting move is cut in pieces, its `A`, `B` and `C` words go in a straight line from the value they had to the one the move gives (they are modal and start at 0), with the same decimals as X, Y and Z, and the last piece ends exactly on the target; the Z of the table still comes from X and Y only. A program with no rotary words is written as before.
 * **The levelled program starts with the standard header:** the generator and its version, the units, the program it came from with its SHA-256 and the tools, as comment lines before the mark; the tests read the result back with the reader of the suite and find no warning, no rapid move into the material and no cut with the spindle off.
 
 ## 🔒 Security & Safety
@@ -108,7 +109,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configuration
 
-A small settings file (`key = value`, one per line, `#` starts a comment) holds what is worth tuning; today it has one key, `decimals`: how many decimals X, Y and Z are written with in the levelled program (3 by default, from 1 to 6). `eh3d-autolevel config` prints the file with every default (`examples/autolevel.cfg` is that file), `--config FILE` reads one and `--decimals N` gives the same key on the command line and wins over the file. A value that makes no sense is an error that says its line. The rest is given as arguments of the command line (see Interfaces) and every default is written in the help of the command (`eh3d-autolevel help`). The fixed limits live in the code as named constants and are covered by tests.
+A small settings file (`key = value`, one per line, `#` starts a comment) holds what is worth tuning; today it has two keys: `decimals`, how many decimals X, Y and Z are written with in the levelled program (3 by default, from 1 to 6), and `max-lines`, the most lines the levelled program may have (5000000 by default, from 1 to 100000000). `eh3d-autolevel config` prints the file with every default (`examples/autolevel.cfg` is that file), `--config FILE` reads one and `--decimals N` and `--max-lines N` give the same keys on the command line and win over the file. A value that makes no sense is an error that says its line. The rest is given as arguments of the command line (see Interfaces) and every default is written in the help of the command (`eh3d-autolevel help`). The fixed limits live in the code as named constants and are covered by tests.
 
 ## 🚀 Quick start
 
@@ -123,7 +124,7 @@ cargo run --release --features gui   # the window
 
 ## 🧪 Testing
 
-The suite has 140 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 148 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 
@@ -148,7 +149,7 @@ EH3D-AUTOLEVEL/
 │   ├── lib.rs                                   the library: what every command uses
 │   ├── main.rs                                  the command line
 │   ├── cli_args.rs                              the arguments of the command line, the same file in every small utility
-│   ├── config.rs                                the settings file: the decimals of the coordinates of the levelled program
+│   ├── config.rs                                the settings file: the decimals of the coordinates and the limit of lines of the levelled program
 │   ├── gcode.rs                                 a part of the logic
 │   ├── surface.rs                               a part of the logic
 │   ├── browse.rs                                the list of files of the window that opens a file
@@ -160,6 +161,7 @@ EH3D-AUTOLEVEL/
 │   ├── autolevel.rs                             tests of the library and the command line
 │   ├── decimals.rs                              tests of the decimals of the coordinates and of the settings file
 │   ├── dry_run.rs                               tests of --dry-run: it counts the same and writes nothing
+│   ├── rotary.rs                                tests of the interpolation of A, B and C and of the limit of lines of the settings file
 │   ├── readme.rs                                tests that run what the README and the run scripts promise
 │   ├── strict.rs                                tests of the mark of a levelled program and of the strict command line
 │   └── window_cli.rs                            tests that a build without the gui feature stays a command line

@@ -69,14 +69,14 @@
         {
           "name": "config.rs",
           "desc": {
-            "en": "the settings file: the decimals of the coordinates of the levelled program",
-            "es": "el fichero de ajustes: los decimales de las coordenadas del programa nivelado",
-            "de": "die Einstellungsdatei: die Dezimalstellen der Koordinaten des nivellierten Programms",
-            "fr": "le fichier de réglages : les décimales des coordonnées du programme nivelé",
-            "it": "il file delle impostazioni: i decimali delle coordinate del programma livellato",
-            "ja": "設定ファイル：補正後プログラムの座標の小数桁数",
-            "zh": "设置文件：校平后程序坐标的小数位数",
-            "pt": "o ficheiro de definições: as casas decimais das coordenadas do programa nivelado"
+            "en": "the settings file: the decimals of the coordinates and the limit of lines of the levelled program",
+            "es": "el fichero de ajustes: los decimales de las coordenadas y el límite de líneas del programa nivelado",
+            "de": "die Einstellungsdatei: die Dezimalstellen der Koordinaten und die Zeilengrenze des nivellierten Programms",
+            "fr": "le fichier de réglages : les décimales des coordonnées et la limite de lignes du programme nivelé",
+            "it": "il file delle impostazioni: i decimali delle coordinate e il limite di righe del programma livellato",
+            "ja": "設定ファイル：補正後プログラムの座標の小数桁数と行数の上限",
+            "zh": "设置文件：校平后程序坐标的小数位数和行数上限",
+            "pt": "o ficheiro de definições: as casas decimais das coordenadas e o limite de linhas do programa nivelado"
           }
         },
         {
@@ -214,6 +214,19 @@
             "ja": "--dry-runのテスト：同じ数を数え、何も書かない",
             "zh": "--dry-run 测试：计数相同且不写入任何内容",
             "pt": "testes de --dry-run: conta o mesmo e não escreve nada"
+          }
+        },
+        {
+          "name": "rotary.rs",
+          "desc": {
+            "en": "tests of the interpolation of A, B and C and of the limit of lines of the settings file",
+            "es": "tests de la interpolación de A, B y C y del límite de líneas del fichero de ajustes",
+            "de": "Tests der Interpolation von A, B und C und der Zeilengrenze der Einstellungsdatei",
+            "fr": "tests de l'interpolation de A, B et C et de la limite de lignes du fichier de réglages",
+            "it": "test dell'interpolazione di A, B e C e del limite di righe del file delle impostazioni",
+            "ja": "A、B、C の補間と設定ファイルの行数上限のテスト",
+            "zh": "A、B、C 插值和设置文件行数上限的测试",
+            "pt": "testes da interpolação de A, B e C e do limite de linhas do ficheiro de definições"
           }
         },
         {
