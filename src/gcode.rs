@@ -47,6 +47,22 @@ pub struct Report {
     pub shift_max: f64,
 }
 
+/// The warning for a program whose Z was moved by more than `limit_mm` (up or down): the largest correction, with its sign, and the limit. `None` when the limit is 0 (no
+/// warning), when no move was corrected or when no correction is above the limit.
+pub fn shift_warning(report: &Report, limit_mm: f64) -> Option<String> {
+    if !(limit_mm.is_finite() && limit_mm > 0.0) || report.moves == 0 {
+        return None;
+    }
+    let worst: f64 = if report.shift_max.abs() >= report.shift_min.abs() {
+        report.shift_max
+    } else {
+        report.shift_min
+    };
+    (worst.abs() > limit_mm).then(|| {
+        format!("the correction of Z reaches {worst:+.4} mm, above warn-shift-mm = {limit_mm}")
+    })
+}
+
 /// The rotary axes, in the order they are written.
 const ROTARY: [char; 3] = ['A', 'B', 'C'];
 const MAX_COORDINATE: f64 = 1.0e6;

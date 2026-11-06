@@ -6,7 +6,7 @@ mod cli_args;
 
 use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::config;
-use eh3d_autolevel::gcode::{correct, mark_with_header, Options};
+use eh3d_autolevel::gcode::{correct, mark_with_header, shift_warning, Options};
 use eh3d_autolevel::surface::Method;
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
 use std::env;
@@ -15,7 +15,7 @@ use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
 
-  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--config FILE] [--dry-run]
+  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--config FILE] [--dry-run]
   eh3d-autolevel config                            every setting with its default, as a file
   eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
@@ -24,6 +24,7 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 --decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
+--warn-shift MM (0 by default: no warning; otherwise 0.001 to 100) shows a warning on the error output when the correction of Z passes MM up or down; the program is written all the same. The key in the file is `warn-shift-mm`.
 A, B and C are interpolated like X and Y when a cutting move is cut in pieces.
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
 
@@ -56,11 +57,17 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
     match cmd.as_str() {
         "apply" => {
             let mut opts = Options::default();
+            let mut warn_shift = 0.0;
             if let Some(path) = flag(&mut args, "--config")? {
                 let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
                 let settings = config::parse(&text).map_err(|e| format!("{path}: {e}"))?;
                 opts.decimals = settings.decimals;
                 opts.max_output_lines = settings.max_lines;
+                warn_shift = settings.warn_shift_mm;
+            }
+            if let Some(w) = flag(&mut args, "--warn-shift")? {
+                warn_shift =
+                    config::parse_warn_shift(&w).map_err(|e| format!("--warn-shift: {e}"))?;
             }
             if let Some(d) = flag(&mut args, "--decimals")? {
                 opts.decimals =
@@ -112,6 +119,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if dry_run {
                 // the program is corrected and counted, and nothing is written
                 println!("dry run, nothing written: {summary}");
+                if let Some(w) = shift_warning(&r, warn_shift) {
+                    eprintln!("warning: {w}");
+                }
                 return Ok(());
             }
             // written beside and renamed, so that a program levelled in place is never left half written
@@ -137,6 +147,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 format!("{}: {e}", args[2])
             })?;
             println!("{summary}");
+            if let Some(w) = shift_warning(&r, warn_shift) {
+                eprintln!("warning: {w}");
+            }
             Ok(())
         }
         "config" => {

@@ -280,6 +280,19 @@
             "zh": "测试没有 gui 特性的构建仍然只是命令行",
             "pt": "testes de que uma compilação sem a funcionalidade gui continua a ser só linha de comandos"
           }
+        },
+        {
+          "name": "warn_shift.rs",
+          "desc": {
+            "en": "tests of the warning for a correction of Z above a limit and of its settings key",
+            "es": "tests del aviso por una corrección de Z superior a un límite y de su clave de ajustes",
+            "de": "Tests der Warnung bei einer Z-Korrektur über einer Grenze und ihres Einstellungsschlüssels",
+            "fr": "tests de l'avertissement pour une correction de Z au-delà d'une limite et de sa clé de réglages",
+            "it": "test dell'avviso per una correzione di Z oltre un limite e della sua chiave delle impostazioni",
+            "ja": "上限を超える Z 補正の警告とその設定キーのテスト",
+            "zh": "Z 修正量超过上限时的警告及其设置键的测试",
+            "pt": "testes do aviso para uma correção de Z acima de um limite e da sua chave de definições"
+          }
         }
       ]
     },

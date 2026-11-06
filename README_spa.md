@@ -17,7 +17,7 @@
 
 ---
 
-**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 158 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
+**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 162 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.0.6` |
 | Madurez | Andamiaje |
-| Pruebas | 158 |
+| Pruebas | 162 |
 | Pila tecnológica | Rust |
 | En hardware real | No probado: nada de esto se ha ejecutado en una máquina |
 
@@ -46,7 +46,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 |---|---|---|
 | Núcleo | 🟡 | corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie; probado en un ordenador con entradas normales y dañadas, no con una colección de ficheros reales. |
 | Línea de comandos | 🟡 | `eh3d-autolevel` ejecuta las mismas funciones que la biblioteca e imprime el resultado; cada error vuelve como mensaje y un código de salida distinto de cero. |
-| Pruebas | 🟡 | 158 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. |
+| Pruebas | 🟡 | 162 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. |
 | Seguridad | 🟡 | Rust seguro y simple (`forbid(unsafe_code)`): nada entra en pánico con los ficheros recibidos y un valor malo es un error con su motivo; sin revisión independiente. |
 | Ventana | 🟠 | Escrita (egui, `--features gui`): abrir o soltar un programa y un mapa de alturas, simular una mesa, ver la mesa como malla coloreada y las trayectorias niveladas, zoom y desplazamiento, ajustar la nivelación, exportar; su lógica está probada, pero todavía no se ha compilado ni visto en una pantalla. |
 | Hardware real | 🔴 | No probado: nada de esto se ha ejecutado en una máquina. |
@@ -100,7 +100,7 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 La biblioteca es `eh3d_autolevel` (`use eh3d_autolevel::...`); la línea de comandos es `eh3d-autolevel`. Las órdenes son estas; cada una imprime su resultado por la salida estándar e informa de un error por la salida de errores con un código de salida distinto de cero. No hay acceso a la red.
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--config FILE] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--config FILE] [--dry-run]
 eh3d-autolevel config                            every setting with its default, as a file
 eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
 eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
@@ -109,7 +109,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configuración
 
-Un pequeño fichero de ajustes (`clave = valor`, uno por línea, `#` empieza un comentario) guarda lo que merece afinarse; hoy tiene dos claves: `decimals`, cuántos decimales se escriben en X, Y y Z del programa nivelado (3 por defecto, de 1 a 6), y `max-lines`, el máximo de líneas que puede tener el programa nivelado (5000000 por defecto, de 1 a 100000000). `eh3d-autolevel config` imprime el fichero con cada valor por defecto (`examples/autolevel.cfg` es ese fichero), `--config FICHERO` lee uno y `--decimals N` y `--max-lines N` dan las mismas claves en la línea de comandos y ganan al fichero. Un valor sin sentido es un error que dice su línea. Lo demás se da como argumentos de la línea de comandos (véase Interfaces) y cada valor por defecto está escrito en la ayuda de la orden (`eh3d-autolevel help`). Los límites fijos están en el código como constantes con nombre y las pruebas los cubren.
+Un pequeño fichero de ajustes (`clave = valor`, uno por línea, `#` empieza un comentario) guarda lo que merece afinarse; hoy tiene tres claves: `decimals`, cuántos decimales se escriben en X, Y y Z del programa nivelado (3 por defecto, de 1 a 6), y `max-lines`, el máximo de líneas que puede tener el programa nivelado (5000000 por defecto, de 1 a 100000000). `eh3d-autolevel config` imprime el fichero con cada valor por defecto (`examples/autolevel.cfg` es ese fichero), `--config FICHERO` lee uno y `--decimals N` y `--max-lines N` dan las mismas claves en la línea de comandos y ganan al fichero. Un valor sin sentido es un error que dice su línea. Lo demás se da como argumentos de la línea de comandos (véase Interfaces) y cada valor por defecto está escrito en la ayuda de la orden (`eh3d-autolevel help`). Los límites fijos están en el código como constantes con nombre y las pruebas los cubren. `warn-shift-mm` es la corrección de Z, en mm, a partir de la cual `apply` muestra un aviso por la salida de errores (0 por defecto: sin aviso; de 0,001 a 100); `--warn-shift MM` la da en la línea de órdenes y gana al fichero, y el programa corregido se escribe igualmente.
 
 ## 🚀 Inicio rápido
 
@@ -127,7 +127,7 @@ Para sacar una captura de la ventana sin abrirla a mano, ejecútelo con `--shot 
 
 ## 🧪 Pruebas
 
-El conjunto tiene 158 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
+El conjunto tiene 162 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilación y publicación
 
@@ -168,7 +168,8 @@ EH3D-AUTOLEVEL/
 │   ├── rotary.rs                                tests de la interpolación de A, B y C y del límite de líneas del fichero de ajustes
 │   ├── readme.rs                                pruebas que ejecutan lo que prometen el README y los scripts run
 │   ├── strict.rs                                pruebas de la marca de un programa nivelado y de la línea de comandos estricta
-│   └── window_cli.rs                            pruebas de que una compilación sin la característica gui sigue siendo solo línea de comandos
+│   ├── window_cli.rs                            pruebas de que una compilación sin la característica gui sigue siendo solo línea de comandos
+│   └── warn_shift.rs                            tests del aviso por una corrección de Z superior a un límite y de su clave de ajustes
 ├── examples/
 │   ├── autolevel.cfg                            el fichero de ajustes con cada ajuste y su valor por defecto
 │   ├── sample.nc                                una muestra para probar el programa
