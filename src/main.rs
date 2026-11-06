@@ -20,6 +20,7 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
   eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
   eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui): with no arguments, with files (a program, a map) or with gui it opens; the commands above never open it
+  eh3d-autolevel gui [FILE...] --shot OUT.png [--size WxH] [--theme forge|dark|light] [--wait N] [--lang CODE] [--replace]   a picture of the window (a build with --features gui)
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 --decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
@@ -221,8 +222,44 @@ fn open_window(files: Vec<String>) -> ExitCode {
     }
 }
 
+/// The picture mode: `--shot FILE.png` opens the window, saves what it draws as a PNG file and closes. The exit code is 0 when the file was written, 1 when it was not and 2 when the
+/// arguments are wrong.
+#[cfg(feature = "gui")]
+fn take_picture(args: &[String]) -> ExitCode {
+    let parsed = match eh3d_autolevel::shot::parse_window_args(args, 64) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let Some(request) = parsed.shot else {
+        eprintln!("error: --shot needs a file to write");
+        return ExitCode::from(2);
+    };
+    let lang = parsed
+        .lang
+        .unwrap_or_else(eh3d_autolevel::lang::Lang::from_env);
+    match eh3d_autolevel::gui::run_shot(parsed.files, lang, request) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: the picture could not be taken: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
+    if eh3d_autolevel::shot::wants_picture(&args) {
+        #[cfg(feature = "gui")]
+        return take_picture(&args);
+        #[cfg(not(feature = "gui"))]
+        {
+            eprintln!("error: this build has no window: build it with --features gui");
+            return ExitCode::from(1);
+        }
+    }
     #[cfg(feature = "gui")]
     if let Some(files) = window_request(&args) {
         return open_window(files);

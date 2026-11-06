@@ -10,6 +10,7 @@ pub mod gcode;
 #[cfg(feature = "gui")]
 pub mod gui;
 pub mod lang;
+pub mod shot;
 pub mod surface;
 pub mod viewport;
 pub mod window;

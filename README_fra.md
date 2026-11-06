@@ -17,7 +17,7 @@
 
 ---
 
-**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 148 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
+**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 158 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.6` |
 | Maturité | Échafaudage |
-| Tests | 148 |
+| Tests | 158 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non essayé : rien ici n'a fonctionné sur une machine |
 
@@ -46,7 +46,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 |---|---|---|
 | Cœur | 🟡 | corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface ; testé sur un ordinateur avec des entrées normales et abîmées, pas avec une collection de fichiers réels. |
 | Ligne de commande | 🟡 | `eh3d-autolevel` exécute les mêmes fonctions que la bibliothèque et affiche le résultat ; chaque erreur revient sous forme de message et de code de sortie non nul. |
-| Tests | 🟡 | 148 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. |
+| Tests | 🟡 | 158 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. |
 | Sécurité | 🟡 | Rust sûr et simple (`forbid(unsafe_code)`) : rien ne panique sur les fichiers reçus et une mauvaise valeur est une erreur avec sa raison ; pas de revue indépendante. |
 | Fenêtre | 🟠 | Écrite (egui, `--features gui`) : ouvrir ou déposer un programme et une carte de hauteurs, simuler une table, voir la table en maillage coloré et les trajets nivelés, zoom et déplacement, régler le nivellement, exporter ; sa logique est testée, mais elle n'a pas encore été compilée ni vue sur un écran. |
 | Matériel réel | 🔴 | Non essayé : rien ici n'a été exécuté sur une machine. |
@@ -120,11 +120,14 @@ cargo build --release
 cargo test
 cargo run --release -- info examples/table.txt
 cargo run --release --features gui   # the window
+cargo run --release --features gui -- --shot screen.png examples/sample.nc   # a picture of the window
 ```
+
+Pour prendre une capture de la fenêtre sans l'ouvrir à la main, lancez-la avec `--shot FICHIER.png` (aussi `--size WxH`, `--theme forge|dark|light`, `--wait N`, `--lang CODE`, `--open FILE`, `--replace`) : elle s'ouvre à cette taille, enregistre le PNG, ne garde aucun réglage et se ferme toute seule (code de sortie 0 si le fichier a été écrit, 1 sinon, 2 si les arguments sont erronés).
 
 ## 🧪 Tests
 
-La suite compte 148 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
+La suite compte 158 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilation et publication
 
@@ -155,6 +158,7 @@ EH3D-AUTOLEVEL/
 │   ├── browse.rs                                la liste des fichiers de la fenêtre d'ouverture d'un fichier
 │   ├── gui.rs                                   la fenêtre (egui, avec la fonctionnalité gui) : dessine l'état et transmet ce que fait la personne
 │   ├── lang.rs                                  les mots de la fenêtre dans les huit langues
+│   ├── shot.rs                                  le mode capture de la fenêtre (--shot) : ses arguments, lus et vérifiés sans écran
 │   ├── viewport.rs                              zoom et déplacement de l'image, en simples nombres
 │   └── window.rs                                l'état de la fenêtre sans écran : programme, carte, réglages et export
 ├── tests/

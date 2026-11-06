@@ -17,7 +17,7 @@
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 148 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Tem uma janela (compilada com `--features gui`) que abre um programa G-code e um mapa de alturas, mostra a mesa como uma malha colorida com as trajetórias niveladas por cima e exporta, mas a janela ainda não foi vista num ecrã; não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
+**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 158 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Tem uma janela (compilada com `--features gui`) que abre um programa G-code e um mapa de alturas, mostra a mesa como uma malha colorida com as trajetórias niveladas por cima e exporta, mas a janela ainda não foi vista num ecrã; não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versão | `0.0.6` |
 | Maturidade | Estrutura inicial |
-| Testes | 148 |
+| Testes | 158 |
 | Tecnologias | Rust |
 | Em hardware real | Não experimentado: nada disto correu numa máquina |
 
@@ -46,7 +46,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 |---|---|---|
 | Núcleo | 🟡 | corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície; testado num computador com entradas normais e danificadas, não com uma coleção de ficheiros reais. |
 | Linha de comandos | 🟡 | `eh3d-autolevel` executa as mesmas funções da biblioteca e imprime o resultado; cada erro volta como mensagem e código de saída diferente de zero. |
-| Testes | 🟡 | 148 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
+| Testes | 🟡 | 158 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
 | Segurança | 🟡 | Rust seguro e simples (`forbid(unsafe_code)`): nada entra em pânico com os ficheiros recebidos e um valor mau é um erro com o seu motivo; sem revisão independente. |
 | Janela | 🟠 | Escrita (egui, `--features gui`): abrir ou largar um programa e um mapa de alturas, simular uma mesa, ver a mesa como malha colorida e as trajetórias niveladas, zoom e deslocamento, ajustar o nivelamento, exportar; a sua lógica está testada, mas ainda não foi compilada nem vista num ecrã. |
 | Hardware real | 🔴 | Não experimentado: nada disto foi executado numa máquina. |
@@ -120,11 +120,14 @@ cargo build --release
 cargo test
 cargo run --release -- info examples/table.txt
 cargo run --release --features gui   # the window
+cargo run --release --features gui -- --shot screen.png examples/sample.nc   # a picture of the window
 ```
+
+Para tirar uma captura da janela sem a abrir à mão, execute-o com `--shot FICHEIRO.png` (também `--size WxH`, `--theme forge|dark|light`, `--wait N`, `--lang CODE`, `--open FILE`, `--replace`): abre-se com esse tamanho, guarda o PNG, não guarda definições e fecha-se sozinho (código de saída 0 se o ficheiro foi escrito, 1 se não, 2 se os argumentos estiverem errados).
 
 ## 🧪 Testes
 
-O conjunto tem 148 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
+O conjunto tem 158 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilação e publicação
 
@@ -155,6 +158,7 @@ EH3D-AUTOLEVEL/
 │   ├── browse.rs                                a lista de ficheiros da janela que abre um ficheiro
 │   ├── gui.rs                                   a janela (egui, com a funcionalidade gui): desenha o estado e transmite o que a pessoa faz
 │   ├── lang.rs                                  as palavras da janela nos oito idiomas
+│   ├── shot.rs                                  o modo de captura da janela (--shot): os seus argumentos, lidos e verificados sem ecrã
 │   ├── viewport.rs                              zoom e deslocamento da imagem, em números simples
 │   └── window.rs                                o estado da janela sem ecrã: programa, mapa, definições e exportação
 ├── tests/
