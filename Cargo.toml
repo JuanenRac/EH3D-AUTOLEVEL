@@ -1,6 +1,6 @@
 [package]
 name = "eh3d-autolevel"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2021"
 rust-version = "1.88"
 description = "Corrects the Z of a G-code program with the height map of the table: long moves are cut in pieces that follow the surface"

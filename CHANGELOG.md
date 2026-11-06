@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.0.7] - Rotary axes kept between moves, a warning when the correction of Z passes a limit and the picture mode
+
 - **A warning when the correction of Z is large:** `warn-shift-mm` in the settings file (or `--warn-shift MM`, which wins over the file; 0 by default: no warning, otherwise from 0.001 to 100 mm) makes `apply`, and `apply --dry-run`, show on the error output the largest correction of Z, with its sign, when it passes the limit up or down; the corrected program is written all the same and the exit code does not change. `examples/autolevel.cfg` carries the new key and is the same file as `eh3d-autolevel config`. The tests use a table that rises 0.001 mm for every mm (0.05 mm at X = 50) and the range of the setting.
 - **The rotary axes A, B and C are interpolated:** when a cutting move (G1) is cut in pieces, its `A`, `B` and `C` words go in a straight line from the value they had to the one the move gives, like X and Y, written with the configured decimals; the last piece ends exactly on the target and the Z of the table still comes from X and Y only. The axes are modal (a move with no `A` writes none, a line with only rotary words or a rapid move sets where they stand) and start at 0. A move that is not cut keeps its words as they were written, and a program with no A, B or C is written exactly as before.
 - **`max-lines` in the settings file:** the most lines the levelled program may have (5000000 by default, from 1 to 100000000), a new strict key with the error of its line (not known, not valid, given twice); `--max-lines` on the command line wins over the file and `eh3d-autolevel config` prints it with the rest.
