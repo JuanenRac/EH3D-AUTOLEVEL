@@ -1,8 +1,9 @@
-//! The settings file of the project: `key = value`, one per line, `#` starts a comment. Today it has three keys: `decimals`, the number of decimals the coordinates of the levelled
-//! program are written with, `max-lines`, the most lines the levelled program may have, and `warn-shift-mm`, the correction of Z above which a warning is shown. The command line takes the same keys as options (`--decimals 3`, `--max-lines 5000`, `--warn-shift 0.3`), which win over the file. A line that makes no sense is an error that says its number.
+//! The settings file of the project: `key = value`, one per line, `#` starts a comment. Today it has five keys: `decimals`, the number of decimals the coordinates of the levelled
+//! program are written with, `max-lines`, the most lines the levelled program may have, and `warn-shift-mm`, the correction of Z above which a warning is shown. The command line takes the same keys as options (`--decimals 3`, `--max-lines 5000`, `--warn-shift 0.3`), which win over the file. `a-axis-compensation` (`off` or `tilt`; `--a-compensation`) and `a-axis-radius-mm` (`--a-radius`) add to Z the tilt that the turn of the axis A brings. A line that makes no sense is an error that says its number.
 
 use crate::gcode::{
-    DEFAULT_DECIMALS, DEFAULT_MAX_OUTPUT_LINES, MAX_DECIMALS, MAX_OUTPUT_LINES_LIMIT, MIN_DECIMALS,
+    AAxisCompensation, DEFAULT_DECIMALS, DEFAULT_MAX_OUTPUT_LINES, MAX_A_RADIUS_MM, MAX_DECIMALS,
+    MAX_OUTPUT_LINES_LIMIT, MIN_DECIMALS,
 };
 
 /// The largest correction of Z that may be asked for as a warning limit, in mm.
@@ -18,6 +19,10 @@ pub struct Settings {
     pub max_lines: usize,
     /// The correction of Z, in mm, above which `apply` shows a warning; 0 gives none, otherwise from 0.001 to 100.
     pub warn_shift_mm: f64,
+    /// Whether the turn of the axis A is added to Z (`off` by default).
+    pub a_axis_compensation: AAxisCompensation,
+    /// The distance from the axis A to the cut, in mm, from -1000 to 1000; it must not be 0 when the compensation is `tilt`.
+    pub a_axis_radius_mm: f64,
 }
 
 impl Default for Settings {
@@ -26,6 +31,8 @@ impl Default for Settings {
             decimals: DEFAULT_DECIMALS,
             max_lines: DEFAULT_MAX_OUTPUT_LINES,
             warn_shift_mm: 0.0,
+            a_axis_compensation: AAxisCompensation::Off,
+            a_axis_radius_mm: 0.0,
         }
     }
 }
@@ -65,12 +72,34 @@ pub fn parse_warn_shift(text: &str) -> Result<f64, String> {
         })
 }
 
+/// The value of `a-axis-compensation` as the file or the command line gives it: `off` or `tilt`.
+pub fn parse_a_compensation(text: &str) -> Result<AAxisCompensation, String> {
+    match text.trim().to_ascii_lowercase().as_str() {
+        "off" => Ok(AAxisCompensation::Off),
+        "tilt" => Ok(AAxisCompensation::Tilt),
+        _ => Err(format!("a-axis-compensation '{text}' must be off or tilt")),
+    }
+}
+
+/// The value of `a-axis-radius-mm` as the file or the command line gives it: a number from -1000 to 1000 mm.
+pub fn parse_a_radius(text: &str) -> Result<f64, String> {
+    text.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite() && v.abs() <= MAX_A_RADIUS_MM)
+        .ok_or_else(|| {
+            format!("a-axis-radius-mm '{text}' must be a number from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM} mm")
+        })
+}
+
 /// Reads a settings file. A key that is not known, a line with no `=` and a value that is not valid are errors with the number of the line; a key given twice is an error too.
 pub fn parse(text: &str) -> Result<Settings, String> {
     let mut settings = Settings::default();
     let mut seen_decimals = false;
     let mut seen_max_lines = false;
     let mut seen_warn_shift = false;
+    let mut seen_a_comp: Option<usize> = None;
+    let mut seen_a_radius = false;
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
         let line = raw.split('#').next().unwrap_or("").trim();
@@ -105,7 +134,30 @@ pub fn parse(text: &str) -> Result<Settings, String> {
                 settings.warn_shift_mm =
                     parse_warn_shift(value).map_err(|e| format!("line {n}: {e}"))?;
             }
+            "a-axis-compensation" => {
+                if seen_a_comp.is_some() {
+                    return Err(format!("line {n}: a-axis-compensation is given twice"));
+                }
+                seen_a_comp = Some(n);
+                settings.a_axis_compensation =
+                    parse_a_compensation(value).map_err(|e| format!("line {n}: {e}"))?;
+            }
+            "a-axis-radius-mm" => {
+                if seen_a_radius {
+                    return Err(format!("line {n}: a-axis-radius-mm is given twice"));
+                }
+                seen_a_radius = true;
+                settings.a_axis_radius_mm =
+                    parse_a_radius(value).map_err(|e| format!("line {n}: {e}"))?;
+            }
             other => return Err(format!("line {n}: '{other}' is not a setting")),
+        }
+    }
+    if let (AAxisCompensation::Tilt, Some(n)) = (settings.a_axis_compensation, seen_a_comp) {
+        if settings.a_axis_radius_mm == 0.0 {
+            return Err(format!(
+                "line {n}: a-axis-compensation = tilt needs a-axis-radius-mm other than 0"
+            ));
         }
     }
     Ok(settings)
@@ -114,6 +166,6 @@ pub fn parse(text: &str) -> Result<Settings, String> {
 /// Every setting with its default, as a file that [`parse`] reads back.
 pub fn default_file() -> String {
     format!(
-        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n# warn when the correction of Z passes this many mm up or down ({MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM}, 0 for no warning)\nwarn-shift-mm = 0\n"
+        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n# warn when the correction of Z passes this many mm up or down ({MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM}, 0 for no warning)\nwarn-shift-mm = 0\n# Z correction for the turn of axis A: off (nothing changes) or tilt (adds radius * (1 - cos A) to Z)\na-axis-compensation = off\n# distance in mm from the axis A to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\na-axis-radius-mm = 0\n"
     )
 }

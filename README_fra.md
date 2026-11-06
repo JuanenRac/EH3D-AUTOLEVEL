@@ -17,7 +17,7 @@
 
 ---
 
-**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 162 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
+**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 172 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.7` |
 | Maturité | Échafaudage |
-| Tests | 162 |
+| Tests | 172 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non essayé : rien ici n'a fonctionné sur une machine |
 
@@ -46,7 +46,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 |---|---|---|
 | Cœur | 🟡 | corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface ; testé sur un ordinateur avec des entrées normales et abîmées, pas avec une collection de fichiers réels. |
 | Ligne de commande | 🟡 | `eh3d-autolevel` exécute les mêmes fonctions que la bibliothèque et affiche le résultat ; chaque erreur revient sous forme de message et de code de sortie non nul. |
-| Tests | 🟡 | 162 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. |
+| Tests | 🟡 | 172 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. |
 | Sécurité | 🟡 | Rust sûr et simple (`forbid(unsafe_code)`) : rien ne panique sur les fichiers reçus et une mauvaise valeur est une erreur avec sa raison ; pas de revue indépendante. |
 | Fenêtre | 🟠 | Écrite (egui, `--features gui`) : ouvrir ou déposer un programme et une carte de hauteurs, simuler une table, voir la table en maillage coloré et les trajets nivelés, zoom et déplacement, régler le nivellement, exporter ; sa logique est testée, mais elle n'a pas encore été compilée ni vue sur un écran. |
 | Matériel réel | 🔴 | Non essayé : rien ici n'a été exécuté sur une machine. |
@@ -83,6 +83,7 @@ Comment les parties de ce dépôt s'articulent : qui l'utilise, ce qu'il contien
 * **Pas de code unsafe :** `#![forbid(unsafe_code)]` dans la bibliothèque et le programme.
 * **Les lignes qui ne sont pas des déplacements passent telles quelles :** les commandes `$`, les affectations `#` et les messages `M117` et `M118` sont écrits comme ils sont, la somme de contrôle d'une ligne numérotée n'est pas un mot, les mots `M` d'un déplacement découpé vont avec son dernier morceau, et `--max-lines` (5000000 par défaut) refuse un programme qui aurait plus de lignes de sortie.
 * **Les axes rotatifs A, B et C sont interpolés :** quand un déplacement de coupe est découpé en morceaux, ses mots `A`, `B` et `C` vont en ligne droite de la valeur qu'ils avaient à celle du déplacement (ils sont modaux et partent de 0), avec les mêmes décimales que X, Y et Z ; le dernier morceau finit exactement sur la cible, et le Z de la table vient toujours de X et Y seulement. Un programme sans mot rotatif est écrit comme avant.
+* **Compensation de Z pour la rotation de l'axe A :** avec `a-axis-compensation = tilt` et `a-axis-radius-mm = r` (ou `--a-compensation tilt --a-radius r`), le Z de chaque déplacement écrit reçoit `r * (1 - cos A)` après la hauteur de la table, avec A en degrés tel que le déplacement le laisse (interpolé morceau par morceau) ; la valeur par défaut est `off`, qui ne change aucune sortie, et un avis sur la sortie d'erreur indique quand elle a été appliquée. La formule est dans `docs/a-axis-compensation.md`.
 * **Le programme nivelé commence par l'en-tête standard :** le générateur et sa version, les unités, le programme d'origine avec son SHA-256 et les outils, en lignes de commentaire avant la marque ; les tests relisent le résultat avec le lecteur de la suite et ne trouvent ni avertissement, ni déplacement rapide dans la matière, ni coupe avec la broche arrêtée.
 
 ## 🔒 Sécurité et protection
@@ -100,7 +101,7 @@ Comment les parties de ce dépôt s'articulent : qui l'utilise, ce qu'il contien
 La bibliothèque est `eh3d_autolevel` (`use eh3d_autolevel::...`) ; la ligne de commande est `eh3d-autolevel`. Les commandes sont celles-ci ; chacune affiche son résultat sur la sortie standard et signale une erreur sur la sortie d'erreur avec un code de sortie non nul. Il n'y a pas d'accès réseau.
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--config FILE] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--config FILE] [--dry-run]
 eh3d-autolevel config                            every setting with its default, as a file
 eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
 eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
@@ -109,7 +110,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configuration
 
-Un petit fichier de réglages (`clé = valeur`, un par ligne, `#` commence un commentaire) contient ce qui mérite d'être ajusté ; il a aujourd'hui trois clés : `decimals`, le nombre de décimales avec lequel X, Y et Z sont écrits dans le programme nivelé (3 par défaut, de 1 à 6), et `max-lines`, le nombre maximal de lignes du programme nivelé (5000000 par défaut, de 1 à 100000000). `eh3d-autolevel config` affiche le fichier avec chaque valeur par défaut (`examples/autolevel.cfg` est ce fichier), `--config FICHIER` en lit un et `--decimals N` et `--max-lines N` donnent les mêmes clés sur la ligne de commande et l'emportent sur le fichier. Une valeur absurde est une erreur qui indique sa ligne. Le reste est donné en arguments de la ligne de commande (voir Interfaces) et chaque valeur par défaut est écrite dans l'aide de la commande (`eh3d-autolevel help`). Les limites fixes sont des constantes nommées dans le code, couvertes par des tests. `warn-shift-mm` est la correction de Z, en mm, au-delà de laquelle `apply` affiche un avertissement sur la sortie d'erreur (0 par défaut : pas d'avertissement ; de 0,001 à 100) ; `--warn-shift MM` la donne en ligne de commande et l'emporte sur le fichier, et le programme corrigé est écrit quand même.
+Un petit fichier de réglages (`clé = valeur`, un par ligne, `#` commence un commentaire) contient ce qui mérite d'être ajusté ; il a aujourd'hui cinq clés : `decimals`, le nombre de décimales avec lequel X, Y et Z sont écrits dans le programme nivelé (3 par défaut, de 1 à 6), et `max-lines`, le nombre maximal de lignes du programme nivelé (5000000 par défaut, de 1 à 100000000). `eh3d-autolevel config` affiche le fichier avec chaque valeur par défaut (`examples/autolevel.cfg` est ce fichier), `--config FICHIER` en lit un et `--decimals N` et `--max-lines N` donnent les mêmes clés sur la ligne de commande et l'emportent sur le fichier. Une valeur absurde est une erreur qui indique sa ligne. Le reste est donné en arguments de la ligne de commande (voir Interfaces) et chaque valeur par défaut est écrite dans l'aide de la commande (`eh3d-autolevel help`). Les limites fixes sont des constantes nommées dans le code, couvertes par des tests. `warn-shift-mm` est la correction de Z, en mm, au-delà de laquelle `apply` affiche un avertissement sur la sortie d'erreur (0 par défaut : pas d'avertissement ; de 0,001 à 100) ; `--warn-shift MM` la donne en ligne de commande et l'emporte sur le fichier, et le programme corrigé est écrit quand même. `a-axis-compensation` (`off` ou `tilt`, `off` par défaut ; `--a-compensation`) et `a-axis-radius-mm` (la distance en mm de l'axe A à la coupe, de -1000 à 1000 et différente de 0 avec `tilt` ; `--a-radius`) ajoutent à Z la correction qu'apporte la rotation de l'axe A (voir `docs/a-axis-compensation.md`) ; les options l'emportent sur le fichier.
 
 ## 🚀 Démarrage rapide
 
@@ -127,7 +128,7 @@ Pour prendre une capture de la fenêtre sans l'ouvrir à la main, lancez-la avec
 
 ## 🧪 Tests
 
-La suite compte 162 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
+La suite compte 172 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilation et publication
 
@@ -162,6 +163,7 @@ EH3D-AUTOLEVEL/
 │   ├── viewport.rs                              zoom et déplacement de l'image, en simples nombres
 │   └── window.rs                                l'état de la fenêtre sans écran : programme, carte, réglages et export
 ├── tests/
+│   ├── a_axis.rs                                tests de la correction de Z pour la rotation de l'axe A, de ses clés de réglages et de ses options
 │   ├── autolevel.rs                             tests de la bibliothèque et de la ligne de commande
 │   ├── decimals.rs                              tests des décimales des coordonnées et du fichier de réglages
 │   ├── dry_run.rs                               tests de --dry-run : compte la même chose et n'écrit rien
@@ -175,6 +177,7 @@ EH3D-AUTOLEVEL/
 │   ├── sample.nc                                un exemple pour essayer le programme
 │   └── table.txt                                un exemple pour essayer le programme
 ├── docs/
+│   ├── a-axis-compensation.md                   la formule de la correction de Z pour la rotation de l'axe A, avec des valeurs calculées
 │   ├── architecture.json                        données de l'image d'Architecture
 │   └── structure.json                           données de l'image de Structure
 ├── tools/                                       contrôle de la CI et du README et outils d'images

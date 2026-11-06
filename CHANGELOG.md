@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Z correction for the turn of the axis A:** `a-axis-compensation = tilt` and `a-axis-radius-mm = r` in the settings file (or `--a-compensation tilt --a-radius r`, which win over the file) add `r * (1 - cos A)` to the Z of every written move after the height of the table, with A in degrees as the move leaves it (interpolated piece by piece, modal like the other axes). It is `off` by default, which changes no output; `tilt` with a radius of 0, or a radius beyond -1000 to 1000 mm, is an error that says its line (file) or names the option. `apply`, and `apply --dry-run`, show a notice on the error output with the number of moves and the largest correction when it was applied, and the shift is part of the `Z shifted from ... to ...` summary and of `warn-shift-mm`. The formula and worked values are in `docs/a-axis-compensation.md`; `examples/autolevel.cfg` carries the new keys and is the same file as `eh3d-autolevel config`.
+
 ## [0.0.7] - Rotary axes kept between moves, a warning when the correction of Z passes a limit and the picture mode
 
 - **A warning when the correction of Z is large:** `warn-shift-mm` in the settings file (or `--warn-shift MM`, which wins over the file; 0 by default: no warning, otherwise from 0.001 to 100 mm) makes `apply`, and `apply --dry-run`, show on the error output the largest correction of Z, with its sign, when it passes the limit up or down; the corrected program is written all the same and the exit code does not change. `examples/autolevel.cfg` carries the new key and is the same file as `eh3d-autolevel config`. The tests use a table that rises 0.001 mm for every mm (0.05 mm at X = 50) and the range of the setting.

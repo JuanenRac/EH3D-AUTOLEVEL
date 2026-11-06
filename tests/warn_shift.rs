@@ -24,6 +24,7 @@ fn the_warning_names_the_largest_correction_with_its_sign_and_the_limit() {
         pieces_added: 0,
         shift_min: -0.12,
         shift_max: 0.35,
+        ..Report::default()
     };
     assert_eq!(
         shift_warning(&r, 0.3).unwrap(),

@@ -6,10 +6,42 @@
 //!
 //! The rotary axes A, B and C are modal like the others: when a cutting move is cut in pieces their words are interpolated in a straight line between the value they had and the value
 //! the move gives, as X and Y are, and written with the same decimals; the height of the table comes from X and Y only. A program with no A, B or C is written as it always was.
+//!
+//! With [`AAxisCompensation::Tilt`] the turn of the axis A also moves the point that is cut in Z: `r * (1 - cos(A))`, with `r` the distance from the axis to that point
+//! ([`Options::a_radius_mm`]) and A in degrees, is added to the Z of every written move, after the height of the table (see `docs/a-axis-compensation.md`).
 
 use crate::surface::{height, Method};
 use eh3d_levelling::HeightMap;
 use eh3d_parser_gcode::emit::{header, sha256_hex, Header};
+
+/// What the turn of the axis A does to Z.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AAxisCompensation {
+    /// Nothing: Z is the height of the table only (the way it always was).
+    #[default]
+    Off,
+    /// The tilt that the turn of A brings is added to Z: `r * (1 - cos(A))`.
+    Tilt,
+}
+
+impl AAxisCompensation {
+    /// The word of the settings file and of the command line.
+    pub fn name(self) -> &'static str {
+        match self {
+            AAxisCompensation::Off => "off",
+            AAxisCompensation::Tilt => "tilt",
+        }
+    }
+}
+
+/// The largest distance from the axis A to the cut that may be given, in mm (up or down; the sign turns the correction round).
+pub const MAX_A_RADIUS_MM: f64 = 1000.0;
+
+/// The correction of Z, in mm, for the axis A standing at `a_deg` degrees when the cut is `radius_mm` from the axis: `radius_mm * (1 - cos(a_deg))`; 0 at A = 0.
+pub fn a_axis_shift(radius_mm: f64, a_deg: f64) -> f64 {
+    let angle: f64 = a_deg.to_radians();
+    radius_mm * (1.0 - angle.cos())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Options {
@@ -22,6 +54,10 @@ pub struct Options {
     pub max_output_lines: usize,
     /// How many decimals the coordinates X, Y and Z are written with (always that many, `X1.000`), from [`MIN_DECIMALS`] to [`MAX_DECIMALS`].
     pub decimals: usize,
+    /// Whether the turn of the axis A is added to Z.
+    pub a_compensation: AAxisCompensation,
+    /// The distance from the axis A to the cut, in mm, for [`AAxisCompensation::Tilt`] (not 0 then; from -1000 to 1000).
+    pub a_radius_mm: f64,
 }
 
 impl Default for Options {
@@ -32,6 +68,8 @@ impl Default for Options {
             method: Method::Bilinear,
             max_output_lines: DEFAULT_MAX_OUTPUT_LINES,
             decimals: DEFAULT_DECIMALS,
+            a_compensation: AAxisCompensation::Off,
+            a_radius_mm: 0.0,
         }
     }
 }
@@ -45,6 +83,20 @@ pub struct Report {
     /// The smallest and the largest correction of Z that was applied.
     pub shift_min: f64,
     pub shift_max: f64,
+    /// How many written moves got a correction of Z from the turn of the axis A (0 when the compensation is off or A stayed at 0).
+    pub a_corrected: usize,
+    /// The largest correction of Z that the axis A gave, with its sign (0 when none).
+    pub a_shift_max: f64,
+}
+
+/// The notice for a program whose Z was corrected for the turn of the axis A: how many moves and the largest correction. `None` when no move was corrected for it.
+pub fn a_axis_notice(report: &Report, opts: &Options) -> Option<String> {
+    (opts.a_compensation == AAxisCompensation::Tilt && report.a_corrected > 0).then(|| {
+        format!(
+            "Z corrected for the turn of axis A on {} moves, up to {:+.4} mm (a-axis-radius-mm = {})",
+            report.a_corrected, report.a_shift_max, opts.a_radius_mm
+        )
+    })
 }
 
 /// The warning for a program whose Z was moved by more than `limit_mm` (up or down): the largest correction, with its sign, and the limit. `None` when the limit is 0 (no
@@ -225,6 +277,17 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         ));
     }
     let d = opts.decimals;
+    if opts.a_compensation == AAxisCompensation::Tilt
+        && !(opts.a_radius_mm.is_finite()
+            && opts.a_radius_mm != 0.0
+            && opts.a_radius_mm.abs() <= MAX_A_RADIUS_MM)
+    {
+        return Err(format!(
+            "a-axis-radius-mm is {}: with a-axis-compensation = tilt it must be a number other than 0, from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}",
+            opts.a_radius_mm
+        ));
+    }
+    let tilt = opts.a_compensation == AAxisCompensation::Tilt;
     if !(opts.max_segment_mm.is_finite() && opts.max_segment_mm > 0.0) {
         return Err(format!(
             "max_segment_mm is {}: it must be more than 0",
@@ -364,9 +427,27 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     .map(|(_, v)| (c, rot[k], *v))
             })
             .collect();
-        let mut track = |shift: f64| {
+        // the correction of Z of the turn of A at the end of a piece (0 when it is off), written down in the report
+        let a_from = rotary
+            .iter()
+            .find(|(c, _, _)| *c == 'A')
+            .map(|&(_, f, t)| (f, t));
+        let mut track = |shift: f64, a_shift: f64| {
             report.shift_min = report.shift_min.min(shift);
             report.shift_max = report.shift_max.max(shift);
+            if a_shift != 0.0 {
+                report.a_corrected += 1;
+                if a_shift.abs() > report.a_shift_max.abs() {
+                    report.a_shift_max = a_shift;
+                }
+            }
+        };
+        let a_shift_of = |a: f64| {
+            if tilt {
+                a_axis_shift(opts.a_radius_mm, a)
+            } else {
+                0.0
+            }
         };
         if m == 0 {
             let mut line = kept.clone();
@@ -375,8 +456,9 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 line.push(format!("{l}{}", coord(*v, d)));
             }
             if has_z {
-                let shift = at(target.0, target.1, n)? - zero;
-                track(shift);
+                let a_shift = a_shift_of(a_from.map_or(rot[0], |(_, to)| to));
+                let shift = at(target.0, target.1, n)? - zero + a_shift;
+                track(shift, a_shift);
                 line.push(format!("Z{}", coord(target.2 + shift, d)));
                 report.moves += 1;
             }
@@ -409,8 +491,15 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     pos.1 + (target.1 - pos.1) * t,
                     pos.2 + (target.2 - pos.2) * t,
                 );
-                let shift = at(x, y, n)? - zero;
-                track(shift);
+                // the piece ends with A where the move puts it (interpolated when it is cut in pieces)
+                let a_here = match a_from {
+                    Some((_, to)) if k == pieces => to,
+                    Some((from, to)) => from + (to - from) * t,
+                    None => rot[0],
+                };
+                let a_shift = a_shift_of(a_here);
+                let shift = at(x, y, n)? - zero + a_shift;
+                track(shift, a_shift);
                 let mut line = format!(
                     "G1 X{} Y{} Z{}",
                     coord(x, d),

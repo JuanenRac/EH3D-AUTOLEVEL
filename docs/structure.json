@@ -191,6 +191,19 @@
       "accent": "d",
       "rows": [
         {
+          "name": "a_axis.rs",
+          "desc": {
+            "en": "tests of the correction of Z for the turn of the axis A, of its settings keys and of its options",
+            "es": "tests de la corrección de Z por el giro del eje A, de sus claves de ajustes y de sus opciones",
+            "de": "Tests der Z-Korrektur für die Drehung der Achse A, ihrer Einstellungsschlüssel und ihrer Optionen",
+            "fr": "tests de la correction de Z pour la rotation de l'axe A, de ses clés de réglages et de ses options",
+            "it": "test della correzione di Z per la rotazione dell'asse A, delle sue chiavi delle impostazioni e delle sue opzioni",
+            "ja": "A 軸の回転による Z 補正、その設定キーとオプションのテスト",
+            "zh": "A 轴转动的 Z 补偿及其设置键和选项的测试",
+            "pt": "testes da correção de Z pela rotação do eixo A, das suas chaves de definições e das suas opções"
+          }
+        },
+        {
           "name": "autolevel.rs",
           "desc": {
             "en": "tests of the library and the command line",
@@ -347,6 +360,19 @@
       "span": 3,
       "accent": "d",
       "rows": [
+        {
+          "name": "a-axis-compensation.md",
+          "desc": {
+            "en": "the formula of the correction of Z for the turn of the axis A, with worked values",
+            "es": "la fórmula de la corrección de Z por el giro del eje A, con valores calculados",
+            "de": "die Formel der Z-Korrektur für die Drehung der Achse A, mit berechneten Werten",
+            "fr": "la formule de la correction de Z pour la rotation de l'axe A, avec des valeurs calculées",
+            "it": "la formula della correzione di Z per la rotazione dell'asse A, con valori calcolati",
+            "ja": "A 軸の回転による Z 補正の式と計算例",
+            "zh": "A 轴转动的 Z 补偿公式及计算示例",
+            "pt": "a fórmula da correção de Z pela rotação do eixo A, com valores calculados"
+          }
+        },
         {
           "name": "architecture.json",
           "desc": {
