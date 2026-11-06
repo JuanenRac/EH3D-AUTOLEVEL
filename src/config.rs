@@ -86,6 +86,6 @@ pub fn parse(text: &str) -> Result<Settings, String> {
 /// Every setting with its default, as a file that [`parse`] reads back.
 pub fn default_file() -> String {
     format!(
-        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n"
+        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n"
     )
 }
