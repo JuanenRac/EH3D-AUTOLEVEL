@@ -295,6 +295,14 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             moves_here = false;
         }
         if !moves_here {
+            // a line with only rotary words (`G1 A30`) moves the rotary axes: the next cut starts where they stand
+            if !dwell {
+                for (k, &c) in ROTARY.iter().enumerate() {
+                    if let Some((_, v)) = w.iter().rev().find(|(l, _)| *l == c) {
+                        rot[k] = *v;
+                    }
+                }
+            }
             out.push_str(raw);
             out.push('\n');
             continue;
