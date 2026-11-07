@@ -75,6 +75,14 @@ EH3D-AUTOLEVEL 是 EH3D Fabrication Suite 的一个程序。它以库和命令�
 
 本仓库各部分如何配合：谁使用它、它包含什么、它依赖什么。图由 `docs/architecture.json` 绘制并与代码核对。
 
+## 🖼️ 屏幕截图
+
+<p align="center">
+  <img src="images/screens/autolevel-01-window.png" alt="载入示例程序和高度图的窗口" width="100%">
+</p>
+
+<p align="center"><em>载入示例程序和高度图的窗口：工作台按高低着色，显示测量点和程序路径，左侧为高度图的摘要。</em></p>
+
 ## ✨ 功能
 
 * **库加命令行：** `eh3d-autolevel` 的每个命令都是库中的函数，套件中的其他程序无需启动进程即可调用。

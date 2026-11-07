@@ -75,6 +75,14 @@ EH3D-AUTOLEVEL é um programa da EH3D Fabrication Suite. Funciona como bibliotec
 
 Como as partes deste repositório se encaixam: quem o usa, o que contém e de que depende. A imagem é desenhada a partir de `docs/architecture.json` e verificada com o código.
 
+## 🖼️ Capturas de ecrã
+
+<p align="center">
+  <img src="images/screens/autolevel-01-window.png" alt="A janela com um programa e um mapa de alturas de exemplo" width="100%">
+</p>
+
+<p align="center"><em>A janela com um programa e um mapa de alturas de exemplo: a mesa colorida de baixo para alto, os pontos medidos e o trajeto do programa, com o resumo do mapa à esquerda.</em></p>
+
 ## ✨ Funcionalidades
 
 * **Biblioteca e linha de comandos:** cada comando de `eh3d-autolevel` é uma função da biblioteca, por isso outro programa da suíte pode chamá-la sem lançar um processo.

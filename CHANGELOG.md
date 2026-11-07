@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- A screenshot of the window in the README, taken with the published program: an example program over the height map of an example table.
 - **The command line reads files with the same size limit as the window:** the height map, the settings file and the G-code program given to `apply`, `info` and the other commands are refused with their name when they are larger than 256 MiB, instead of being loaded into memory whole; two more tests (174).
 - **Z correction for the turn of the axis A:** `a-axis-compensation = tilt` and `a-axis-radius-mm = r` in the settings file (or `--a-compensation tilt --a-radius r`, which win over the file) add `r * (1 - cos A)` to the Z of every written move after the height of the table, with A in degrees as the move leaves it (interpolated piece by piece, modal like the other axes). It is `off` by default, which changes no output; `tilt` with a radius of 0, or a radius beyond -1000 to 1000 mm, is an error that says its line (file) or names the option. `apply`, and `apply --dry-run`, show a notice on the error output with the number of moves and the largest correction when it was applied, and the shift is part of the `Z shifted from ... to ...` summary and of `warn-shift-mm`. The formula and worked values are in `docs/a-axis-compensation.md`; `examples/autolevel.cfg` carries the new keys and is the same file as `eh3d-autolevel config`.
 
