@@ -8,6 +8,7 @@ use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::config;
 use eh3d_autolevel::gcode::{a_axis_notice, correct, mark_with_header, shift_warning, Options};
 use eh3d_autolevel::surface::Method;
+use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
 use std::env;
 use std::fs;
@@ -29,9 +30,13 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 A, B and C are interpolated like X and Y when a cutting move is cut in pieces.
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
 
+/// The text of a file given on the command line, with the same size limit as the window.
+fn read_text(path: &str) -> Result<String, String> {
+    read_limited(std::path::Path::new(path), MAX_FILE_BYTES)
+}
+
 fn load_map(path: &str) -> Result<HeightMap, String> {
-    HeightMap::from_text(&fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?)
-        .map_err(|e| format!("{path}: {e}"))
+    HeightMap::from_text(&read_text(path)?).map_err(|e| format!("{path}: {e}"))
 }
 
 /// True when two paths name the same file (compared once resolved; by their text when one does not exist yet).
@@ -60,7 +65,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             let mut opts = Options::default();
             let mut warn_shift = 0.0;
             if let Some(path) = flag(&mut args, "--config")? {
-                let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+                let text = read_text(&path)?;
                 let settings = config::parse(&text).map_err(|e| format!("{path}: {e}"))?;
                 opts.decimals = settings.decimals;
                 opts.max_output_lines = settings.max_lines;
@@ -121,7 +126,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 ));
             }
             let map = load_map(&args[0])?;
-            let text = fs::read_to_string(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?;
+            let text = read_text(&args[1])?;
             let (out, r) = correct(&text, &map, &opts)?;
             let summary = format!(
                 "{} moves corrected, {} pieces added, Z shifted from {:+.4} to {:+.4} mm",

@@ -218,6 +218,16 @@ fn colour_by_table(segs: &mut [Seg], map: &HeightMap, method: Method) {
     }
 }
 
+/// The text of a file when it is not larger than `limit` bytes: the command line reads with it, so that a file by mistake does not fill the memory.
+pub fn read_limited(path: &Path, limit: u64) -> Result<String, String> {
+    let shown = path.display();
+    let meta = std::fs::metadata(path).map_err(|e| format!("{shown}: {e}"))?;
+    if meta.len() > limit {
+        return Err(format!("{shown}: the file is larger than {limit} bytes"));
+    }
+    std::fs::read_to_string(path).map_err(|e| format!("{shown}: {e}"))
+}
+
 /// The text of a file, if it is not too big.
 fn read_text(path: &Path) -> Result<String, String> {
     let shown = path.display();
