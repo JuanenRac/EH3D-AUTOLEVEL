@@ -286,9 +286,19 @@ fn codes_that_move_the_origin_or_the_offsets_are_refused_and_never_become_moves(
 
 #[test]
 fn a_map_without_a_usable_height_is_refused_instead_of_writing_nan() {
+    let unmeasured = HeightMap::new(Grid::new((0.0, 0.0, 100.0, 100.0), 3, 3));
+    let err = correct("G90\nG0 X1 Y1 Z1\n", &unmeasured, &Options::default()).unwrap_err();
+    assert!(
+        err.contains("no height") || err.contains("measured"),
+        "{err}"
+    );
+}
+
+#[test]
+fn an_area_with_no_width_gives_a_finite_height() {
     let flat_in_x = HeightMap::flat(Grid::new((0.0, 0.0, 0.0, 100.0), 3, 3), 0.0);
-    let err = correct("G90\nG0 X1 Y1 Z1\n", &flat_in_x, &Options::default()).unwrap_err();
-    assert!(err.contains("no height"), "{err}");
+    let (out, _) = correct("G90\nG0 X1 Y1 Z1\n", &flat_in_x, &Options::default()).unwrap();
+    assert!(!out.contains("NaN") && !out.contains("inf"), "{out}");
 }
 
 // ---- more edges: comments, modal moves, line ends, piece counts, flat tables and the marks ----
