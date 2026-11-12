@@ -17,7 +17,7 @@
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 174 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Tem uma janela (compilada com `--features gui`) que abre um programa G-code e um mapa de alturas, mostra a mesa como uma malha colorida com as trajetórias niveladas por cima e exporta, mas a janela ainda não foi vista num ecrã; não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
+**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 181 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Tem uma janela (compilada com `--features gui`) que abre um programa G-code e um mapa de alturas, mostra a mesa como uma malha colorida com as trajetórias niveladas por cima e exporta, mas a janela ainda não foi vista num ecrã; não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versão | `0.0.7` |
 | Maturidade | Estrutura inicial |
-| Testes | 174 |
+| Testes | 181 |
 | Tecnologias | Rust |
 | Em hardware real | Não experimentado: nada disto correu numa máquina |
 
@@ -46,7 +46,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 |---|---|---|
 | Núcleo | 🟡 | corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície; testado num computador com entradas normais e danificadas, não com uma coleção de ficheiros reais. |
 | Linha de comandos | 🟡 | `eh3d-autolevel` executa as mesmas funções da biblioteca e imprime o resultado; cada erro volta como mensagem e código de saída diferente de zero. |
-| Testes | 🟡 | 174 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
+| Testes | 🟡 | 181 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. |
 | Segurança | 🟡 | Rust seguro e simples (`forbid(unsafe_code)`): nada entra em pânico com os ficheiros recebidos e um valor mau é um erro com o seu motivo; sem revisão independente. |
 | Janela | 🟠 | Escrita (egui, `--features gui`): abrir ou largar um programa e um mapa de alturas, simular uma mesa, ver a mesa como malha colorida e as trajetórias niveladas, zoom e deslocamento, ajustar o nivelamento, exportar; a sua lógica está testada, mas ainda não foi compilada nem vista num ecrã. |
 | Hardware real | 🔴 | Não experimentado: nada disto foi executado numa máquina. |
@@ -92,6 +92,7 @@ Como as partes deste repositório se encaixam: quem o usa, o que contém e de qu
 * **As linhas que não são movimentos passam tal como estão:** os comandos `$`, as atribuições `#` e as mensagens `M117` e `M118` escrevem-se como estão, a soma de verificação de uma linha numerada não é uma palavra, as palavras `M` de um movimento cortado vão com a sua última peça e `--max-lines` (5000000 por omissão) recusa um programa com mais linhas de saída.
 * **Os eixos rotativos A, B e C são interpolados:** quando um movimento de corte é cortado em peças, as suas palavras `A`, `B` e `C` vão em linha reta do valor que tinham para o do movimento (são modais e começam em 0), com as mesmas casas decimais que X, Y e Z; a última peça acaba exatamente no destino e o Z da mesa continua a vir só de X e Y. Um programa sem palavras rotativas escreve-se como antes.
 * **Compensação de Z pela rotação do eixo A:** com `a-axis-compensation = tilt` e `a-axis-radius-mm = r` (ou `--a-compensation tilt --a-radius r`), ao Z de cada movimento escrito soma-se `r * (1 - cos A)` depois da altura da mesa, com A em graus tal como o movimento a deixa (interpolada peça a peça); por omissão é `off`, que não altera nenhuma saída, e um aviso na saída de erros diz quando foi aplicada. A fórmula está em `docs/a-axis-compensation.md`.
+* **Os eixos B e C:** o eixo B (uma rotação em torno de Y) tem a mesma compensação com o seu próprio raio (`b-axis-compensation = tilt` e `b-axis-radius-mm` no ficheiro, `--b-compensation` e `--b-radius`) e as duas somam-se; o eixo C roda em torno de Z, não altera nenhuma altura e não precisa de nenhuma (as suas palavras são transportadas e interpoladas como as de A e B). Uma máquina simulada percorre o programa nivelado e verifica a profundidade abaixo da mesa; nada foi executado numa máquina com eixos rotativos.
 * **O programa nivelado começa com o cabeçalho padrão:** o gerador e a sua versão, as unidades, o programa de origem com o seu SHA-256 e as ferramentas, como linhas de comentário antes da marca; os testes voltam a ler o resultado com o leitor da suite e não encontram nenhum aviso, nenhum movimento rápido para dentro do material nem nenhum corte com o fuso parado.
 
 ## 🔒 Segurança e proteção
@@ -136,7 +137,7 @@ Para tirar uma captura da janela sem a abrir à mão, execute-o com `--shot FICH
 
 ## 🧪 Testes
 
-O conjunto tem 174 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
+O conjunto tem 181 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilação e publicação
 
@@ -172,6 +173,7 @@ EH3D-AUTOLEVEL/
 │   └── window.rs                                o estado da janela sem ecrã: programa, mapa, definições e exportação
 ├── tests/
 │   ├── a_axis.rs                                testes da correção de Z pela rotação do eixo A, das suas chaves de definições e das suas opções
+│   ├── rotary_axes.rs                           testes dos eixos B e C e da máquina simulada que verifica a profundidade abaixo da mesa
 │   ├── autolevel.rs                             testes da biblioteca e da linha de comandos
 │   ├── decimals.rs                              testes das casas decimais das coordenadas e do ficheiro de definições
 │   ├── dry_run.rs                               testes de --dry-run: conta o mesmo e não escreve nada

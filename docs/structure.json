@@ -204,6 +204,19 @@
           }
         },
         {
+          "name": "rotary_axes.rs",
+          "desc": {
+            "en": "tests of the axes B and C and the simulated machine that checks the depth below the table",
+            "es": "pruebas de los ejes B y C y de la máquina simulada que comprueba la profundidad bajo la mesa",
+            "de": "Tests der Achsen B und C und der simulierten Maschine, die die Tiefe unter dem Tisch prüft",
+            "fr": "tests des axes B et C et de la machine simulée qui vérifie la profondeur sous la table",
+            "it": "test degli assi B e C e della macchina simulata che verifica la profondità sotto il piano",
+            "ja": "B軸・C軸と、テーブル下の深さを確認するシミュレート機械のテスト",
+            "zh": "B 轴和 C 轴以及检查工作台下深度的模拟机床的测试",
+            "pt": "testes dos eixos B e C e da máquina simulada que verifica a profundidade abaixo da mesa"
+          }
+        },
+        {
           "name": "autolevel.rs",
           "desc": {
             "en": "tests of the library and the command line",

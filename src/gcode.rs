@@ -8,7 +8,9 @@
 //! the move gives, as X and Y are, and written with the same decimals; the height of the table comes from X and Y only. A program with no A, B or C is written as it always was.
 //!
 //! With [`AAxisCompensation::Tilt`] the turn of the axis A also moves the point that is cut in Z: `r * (1 - cos(A))`, with `r` the distance from the axis to that point
-//! ([`Options::a_radius_mm`]) and A in degrees, is added to the Z of every written move, after the height of the table (see `docs/a-axis-compensation.md`).
+//! ([`Options::a_radius_mm`]) and A in degrees, is added to the Z of every written move, after the height of the table (see `docs/a-axis-compensation.md`). The axis B (a turn about Y)
+//! has the same compensation with its own radius ([`Options::b_compensation`], [`Options::b_radius_mm`]) and the two add up. The axis C turns about Z, so it never changes the height of the
+//! cut: its words are interpolated and written like the others and nothing is added to Z for them.
 
 use crate::surface::{height, Method};
 use eh3d_levelling::HeightMap;
@@ -58,6 +60,10 @@ pub struct Options {
     pub a_compensation: AAxisCompensation,
     /// The distance from the axis A to the cut, in mm, for [`AAxisCompensation::Tilt`] (not 0 then; from -1000 to 1000).
     pub a_radius_mm: f64,
+    /// Whether the turn of the axis B is added to Z (the same compensation as A, with its own radius).
+    pub b_compensation: AAxisCompensation,
+    /// The distance from the axis B to the cut, in mm, for [`AAxisCompensation::Tilt`] (not 0 then; from -1000 to 1000).
+    pub b_radius_mm: f64,
 }
 
 impl Default for Options {
@@ -70,6 +76,8 @@ impl Default for Options {
             decimals: DEFAULT_DECIMALS,
             a_compensation: AAxisCompensation::Off,
             a_radius_mm: 0.0,
+            b_compensation: AAxisCompensation::Off,
+            b_radius_mm: 0.0,
         }
     }
 }
@@ -87,6 +95,9 @@ pub struct Report {
     pub a_corrected: usize,
     /// The largest correction of Z that the axis A gave, with its sign (0 when none).
     pub a_shift_max: f64,
+    /// The same for the axis B.
+    pub b_corrected: usize,
+    pub b_shift_max: f64,
 }
 
 /// The notice for a program whose Z was corrected for the turn of the axis A: how many moves and the largest correction. `None` when no move was corrected for it.
@@ -95,6 +106,16 @@ pub fn a_axis_notice(report: &Report, opts: &Options) -> Option<String> {
         format!(
             "Z corrected for the turn of axis A on {} moves, up to {:+.4} mm (a-axis-radius-mm = {})",
             report.a_corrected, report.a_shift_max, opts.a_radius_mm
+        )
+    })
+}
+
+/// The notice for a program whose Z was corrected for the turn of the axis B: how many moves and the largest correction. `None` when no move was corrected for it.
+pub fn b_axis_notice(report: &Report, opts: &Options) -> Option<String> {
+    (opts.b_compensation == AAxisCompensation::Tilt && report.b_corrected > 0).then(|| {
+        format!(
+            "Z corrected for the turn of axis B on {} moves, up to {:+.4} mm (b-axis-radius-mm = {})",
+            report.b_corrected, report.b_shift_max, opts.b_radius_mm
         )
     })
 }
@@ -287,7 +308,18 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             opts.a_radius_mm
         ));
     }
+    if opts.b_compensation == AAxisCompensation::Tilt
+        && !(opts.b_radius_mm.is_finite()
+            && opts.b_radius_mm != 0.0
+            && opts.b_radius_mm.abs() <= MAX_A_RADIUS_MM)
+    {
+        return Err(format!(
+            "b-axis-radius-mm is {}: with b-axis-compensation = tilt it must be a number other than 0, from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}",
+            opts.b_radius_mm
+        ));
+    }
     let tilt = opts.a_compensation == AAxisCompensation::Tilt;
+    let tilt_b = opts.b_compensation == AAxisCompensation::Tilt;
     if !(opts.max_segment_mm.is_finite() && opts.max_segment_mm > 0.0) {
         return Err(format!(
             "max_segment_mm is {}: it must be more than 0",
@@ -432,7 +464,11 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             .iter()
             .find(|(c, _, _)| *c == 'A')
             .map(|&(_, f, t)| (f, t));
-        let mut track = |shift: f64, a_shift: f64| {
+        let b_from = rotary
+            .iter()
+            .find(|(c, _, _)| *c == 'B')
+            .map(|&(_, f, t)| (f, t));
+        let mut track = |shift: f64, a_shift: f64, b_shift: f64| {
             report.shift_min = report.shift_min.min(shift);
             report.shift_max = report.shift_max.max(shift);
             if a_shift != 0.0 {
@@ -440,6 +476,19 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 if a_shift.abs() > report.a_shift_max.abs() {
                     report.a_shift_max = a_shift;
                 }
+            }
+            if b_shift != 0.0 {
+                report.b_corrected += 1;
+                if b_shift.abs() > report.b_shift_max.abs() {
+                    report.b_shift_max = b_shift;
+                }
+            }
+        };
+        let b_shift_of = |b: f64| {
+            if tilt_b {
+                a_axis_shift(opts.b_radius_mm, b)
+            } else {
+                0.0
             }
         };
         let a_shift_of = |a: f64| {
@@ -457,8 +506,9 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             }
             if has_z {
                 let a_shift = a_shift_of(a_from.map_or(rot[0], |(_, to)| to));
-                let shift = at(target.0, target.1, n)? - zero + a_shift;
-                track(shift, a_shift);
+                let b_shift = b_shift_of(b_from.map_or(rot[1], |(_, to)| to));
+                let shift = at(target.0, target.1, n)? - zero + a_shift + b_shift;
+                track(shift, a_shift, b_shift);
                 line.push(format!("Z{}", coord(target.2 + shift, d)));
                 report.moves += 1;
             }
@@ -498,8 +548,14 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     None => rot[0],
                 };
                 let a_shift = a_shift_of(a_here);
-                let shift = at(x, y, n)? - zero + a_shift;
-                track(shift, a_shift);
+                let b_here = match b_from {
+                    Some((_, to)) if k == pieces => to,
+                    Some((from, to)) => from + (to - from) * t,
+                    None => rot[1],
+                };
+                let b_shift = b_shift_of(b_here);
+                let shift = at(x, y, n)? - zero + a_shift + b_shift;
+                track(shift, a_shift, b_shift);
                 let mut line = format!(
                     "G1 X{} Y{} Z{}",
                     coord(x, d),

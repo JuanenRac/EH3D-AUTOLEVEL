@@ -58,5 +58,23 @@ Nothing is written when the compensation is `off` or when A stayed at 0.
 
 ## Limits
 
-The correction is the one of a point on a circle around the axis: it does not model an offset of the axis in Y or Z, a tool length, or a turn of B or C. The radius is a setting of the
-file because it depends on the machine.
+The correction is the one of a point on a circle around the axis: it does not model an offset of the axis in Y or Z or a tool length. The radius is a setting of the file because it
+depends on the machine.
+
+## The axes B and C
+
+The axis B (a turn about Y) has the same compensation with its own radius: `b-axis-compensation = tilt` and `b-axis-radius-mm` in the file, `--b-compensation tilt` and `--b-radius MM` on
+the command line. The shift of B is `r_b * (1 - cos(B))` and it adds to the one of A, so a program that turns both is corrected for both. The notice has its own line:
+
+```text
+warning: Z corrected for the turn of axis B on 1 moves, up to +40.0000 mm (b-axis-radius-mm = 40)
+```
+
+The axis C turns about Z: it does not change the height of the cut, so it has no compensation. Its words are carried like A and B (interpolated when a move is cut in pieces, written with
+the same decimals, the last piece ending exactly where the move says) and nothing is added to Z for them.
+
+## Simulation
+
+`tests/rotary_axes.rs` walks the levelled program with a simulated machine: at every line that writes X, Y and Z it computes the depth of the tool below the surface of the table (the Z
+written, minus the lift that A and B bring, minus the height of the table) and checks that it is the depth the original program asked for, with the three axes turning inside moves that are
+cut in pieces. Nothing has run on a machine with rotary axes.

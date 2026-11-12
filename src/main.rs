@@ -6,7 +6,9 @@ mod cli_args;
 
 use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::config;
-use eh3d_autolevel::gcode::{a_axis_notice, correct, mark_with_header, shift_warning, Options};
+use eh3d_autolevel::gcode::{
+    a_axis_notice, b_axis_notice, correct, mark_with_header, shift_warning, Options,
+};
 use eh3d_autolevel::surface::Method;
 use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
@@ -26,7 +28,7 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 --decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
 --warn-shift MM (0 by default: no warning; otherwise 0.001 to 100) shows a warning on the error output when the correction of Z passes MM up or down; the program is written all the same. The key in the file is `warn-shift-mm`.
---a-compensation tilt (off by default) adds r * (1 - cos A) to Z for the turn of the axis A, with r from --a-radius MM (-1000 to 1000, not 0); the keys of the file are `a-axis-compensation` and `a-axis-radius-mm`, and the options win over the file. A notice on the error output says when it was applied.
+--a-compensation tilt (off by default) adds r * (1 - cos A) to Z for the turn of the axis A, with r from --a-radius MM (-1000 to 1000, not 0); the keys of the file are `a-axis-compensation` and `a-axis-radius-mm`, and the options win over the file. The axis B (a turn about Y) has the same with --b-compensation tilt and --b-radius MM (`b-axis-compensation`, `b-axis-radius-mm`) and the two add up; the axis C turns about Z and needs none (its words are carried like A and B). A notice on the error output says when it was applied.
 A, B and C are interpolated like X and Y when a cutting move is cut in pieces.
 MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
 
@@ -72,6 +74,8 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 warn_shift = settings.warn_shift_mm;
                 opts.a_compensation = settings.a_axis_compensation;
                 opts.a_radius_mm = settings.a_axis_radius_mm;
+                opts.b_compensation = settings.b_axis_compensation;
+                opts.b_radius_mm = settings.b_axis_radius_mm;
             }
             if let Some(c) = flag(&mut args, "--a-compensation")? {
                 opts.a_compensation = config::parse_a_compensation(&c)
@@ -80,6 +84,14 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if let Some(r) = flag(&mut args, "--a-radius")? {
                 opts.a_radius_mm =
                     config::parse_a_radius(&r).map_err(|e| format!("--a-radius: {e}"))?;
+            }
+            if let Some(c) = flag(&mut args, "--b-compensation")? {
+                opts.b_compensation = config::parse_b_compensation(&c)
+                    .map_err(|e| format!("--b-compensation: {e}"))?;
+            }
+            if let Some(r) = flag(&mut args, "--b-radius")? {
+                opts.b_radius_mm =
+                    config::parse_b_radius(&r).map_err(|e| format!("--b-radius: {e}"))?;
             }
             if let Some(w) = flag(&mut args, "--warn-shift")? {
                 warn_shift =
@@ -138,6 +150,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 if let Some(n) = a_axis_notice(&r, &opts) {
                     eprintln!("warning: {n}");
                 }
+                if let Some(n) = b_axis_notice(&r, &opts) {
+                    eprintln!("warning: {n}");
+                }
                 if let Some(w) = shift_warning(&r, warn_shift) {
                     eprintln!("warning: {w}");
                 }
@@ -167,6 +182,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             })?;
             println!("{summary}");
             if let Some(n) = a_axis_notice(&r, &opts) {
+                eprintln!("warning: {n}");
+            }
+            if let Some(n) = b_axis_notice(&r, &opts) {
                 eprintln!("warning: {n}");
             }
             if let Some(w) = shift_warning(&r, warn_shift) {

@@ -17,7 +17,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 174 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 181 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.0.7` |
 | Maturity | Scaffolding |
-| Tests | 174 |
+| Tests | 181 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -46,7 +46,7 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 174 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
+| Tests | 🟡 | 181 tests pass (`cargo test`), with normal cases, edge cases and damaged input. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
 | Window | 🟠 | Written (egui, `--features gui`): open or drop a program and a height map, simulate a table, see the table as a coloured mesh and the levelled paths, zoom and pan, set the levelling, export; its logic is tested, but it has not been built or looked at on a screen yet. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
@@ -92,6 +92,7 @@ How the parts of this repository fit together: who uses it, what it holds and wh
 * **Lines that are not moves pass through:** `$` commands, `#` assignments and the messages `M117` and `M118` are written as they are, the checksum of a numbered line is not a word, the `M` words of a cut move go with its last piece, and `--max-lines` (5000000 by default) refuses a program that would have more output lines.
 * **The rotary axes A, B and C are interpolated:** when a cutting move is cut in pieces, its `A`, `B` and `C` words go in a straight line from the value they had to the one the move gives (they are modal and start at 0), with the same decimals as X, Y and Z, and the last piece ends exactly on the target; the Z of the table still comes from X and Y only. A program with no rotary words is written as before.
 * **Z compensation for the turn of the axis A:** with `a-axis-compensation = tilt` and `a-axis-radius-mm = r` (or `--a-compensation tilt --a-radius r`), every written move gets `r * (1 - cos A)` added to its Z after the height of the table, with A in degrees as the move leaves it (interpolated piece by piece); it is `off` by default, which changes no output, and a notice on the error output says when it was applied. The formula is in `docs/a-axis-compensation.md`.
+* **The axes B and C:** the axis B (a turn about Y) has the same compensation with its own radius (`b-axis-compensation = tilt` and `b-axis-radius-mm` in the file, `--b-compensation` and `--b-radius`) and the two add up; the axis C turns about Z, changes no height and needs none (its words are carried and interpolated like A and B). A simulated machine walks the levelled program and checks the depth below the table; nothing has run on a machine with rotary axes.
 * **The levelled program starts with the standard header:** the generator and its version, the units, the program it came from with its SHA-256 and the tools, as comment lines before the mark; the tests read the result back with the reader of the suite and find no warning, no rapid move into the material and no cut with the spindle off.
 
 ## 🔒 Security & Safety
@@ -136,7 +137,7 @@ To take a picture of the window without opening it by hand, run it with `--shot 
 
 ## 🧪 Testing
 
-The suite has 174 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 181 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 
@@ -172,6 +173,7 @@ EH3D-AUTOLEVEL/
 │   └── window.rs                                the state of the window without a screen: program, map, settings and export
 ├── tests/
 │   ├── a_axis.rs                                tests of the correction of Z for the turn of the axis A, of its settings keys and of its options
+│   ├── rotary_axes.rs                           tests of the axes B and C and the simulated machine that checks the depth below the table
 │   ├── autolevel.rs                             tests of the library and the command line
 │   ├── decimals.rs                              tests of the decimals of the coordinates and of the settings file
 │   ├── dry_run.rs                               tests of --dry-run: it counts the same and writes nothing
