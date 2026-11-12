@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Fuzz tests with a fixed seed:** 800 random programs (with the compensation of A and B on) are levelled or refused without a panic and without a number that is not finite, the same program gives the same levelling every time, and a program cut at any byte is levelled or refused.
+
 - **The axes B and C complete the rotary axes:** the axis B has the same compensation of Z as A with its own radius (`b-axis-compensation`, `b-axis-radius-mm`, `--b-compensation`, `--b-radius`; the two add up and the notice names B), and C, which turns about Z, changes no height and is carried and interpolated like the others. `tests/rotary_axes.rs` walks the levelled program with a simulated machine and checks the depth below the table with A, B and C turning inside moves cut in pieces; nothing has run on a machine with rotary axes.
 
 - A screenshot of the window in the README, taken with the published program: an example program over the height map of an example table.
