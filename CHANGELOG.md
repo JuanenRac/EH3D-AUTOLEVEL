@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Simulation of a probing session:** add `tests/probe_session.rs`, a twin of the probe node that sends the readings of a simulated table (the same seed gives the same readings) and fails once by plan: no contact, a garbled line, the reading of another point, a spike. A session driver stores only the reading of the point it asked for, tries a point again, stops when the map cannot be completed and resumes from a map saved as text after a cut. Seven tests cover the retry, the refusal of half a map, the lines that are not stored, the resumed session that gives the same map, the spike found by its distance from the plane and measured again, and a point that never touches. Nothing has run on a real probe.
+
 - **The shared validation tools are updated:** the validator also runs the workflow and lessons checks of the suite with their latest rules, including a check to run before every push.
 - **The CI validation checks the workflows and the lessons of past CI failures against a baseline:** `tools/workflow_hygiene.py` and `tools/lessons_lint.py` (copies of the shared tools) run in the validation, and only findings that are not in `tools/workflow_hygiene_baseline.json` and `tools/lessons_lint_baseline.json` fail it, so what exists today stays as it is and a new one is caught. `python tools/workflow_hygiene.py --root . --detail` and `python tools/lessons_lint.py --repo .` list the findings.
 - **The validation of the CI is the reusable one of the documentation hub:** the job `validate` calls `validate.yml` of EH3D-DOCS (pinned by commit) and the check of the CHANGELOG is a job of its own.
