@@ -36,6 +36,26 @@ impl AAxisCompensation {
     }
 }
 
+/// What to do with a move that leaves out an axis the program has not set yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UnknownAxis {
+    /// The program is taken to start at 0 on every axis (the way it always was).
+    #[default]
+    AssumeZero,
+    /// The program is refused with the number of the line: nothing says where the axis stands.
+    Refuse,
+}
+
+impl UnknownAxis {
+    /// The word of the settings file and of the command line.
+    pub fn name(self) -> &'static str {
+        match self {
+            UnknownAxis::AssumeZero => "assume-zero",
+            UnknownAxis::Refuse => "refuse",
+        }
+    }
+}
+
 /// The largest distance from the axis A to the cut that may be given, in mm (up or down; the sign turns the correction round).
 pub const MAX_A_RADIUS_MM: f64 = 1000.0;
 
@@ -64,6 +84,8 @@ pub struct Options {
     pub b_compensation: AAxisCompensation,
     /// The distance from the axis B to the cut, in mm, for [`AAxisCompensation::Tilt`] (not 0 then; from -1000 to 1000).
     pub b_radius_mm: f64,
+    /// What a move does that leaves out X, Y or Z before the program has set it (`assume-zero` by default).
+    pub unknown_axis: UnknownAxis,
 }
 
 impl Default for Options {
@@ -78,6 +100,7 @@ impl Default for Options {
             a_radius_mm: 0.0,
             b_compensation: AAxisCompensation::Off,
             b_radius_mm: 0.0,
+            unknown_axis: UnknownAxis::AssumeZero,
         }
     }
 }
@@ -381,6 +404,8 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
     };
     let mut mode: Option<u32> = None;
     let mut pos = (0.0, 0.0, 0.0);
+    // which of X, Y and Z the program has set so far
+    let mut known = [false; 3];
     // where A, B and C stand (the program is assumed to start at 0), followed from line to line
     let mut rot = [0.0_f64; 3];
     for (i, raw) in text.lines().enumerate() {
@@ -467,6 +492,20 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 .map(|(_, v)| *v)
                 .unwrap_or(default)
         };
+        if opts.unknown_axis == UnknownAxis::Refuse {
+            for (k, c) in ['X', 'Y', 'Z'].into_iter().enumerate() {
+                if !known[k] && !w.iter().any(|(l, _)| *l == c) {
+                    return Err(format!(
+                        "line {n}: the move leaves out {c} and the program has not set it yet, so its place is not known (unknown-axis = refuse)"
+                    ));
+                }
+            }
+        }
+        for (k, c) in ['X', 'Y', 'Z'].into_iter().enumerate() {
+            if w.iter().any(|(l, _)| *l == c) {
+                known[k] = true;
+            }
+        }
         let target = (get('X', pos.0), get('Y', pos.1), get('Z', pos.2));
         for v in [target.0, target.1, target.2] {
             if v.abs() > MAX_COORDINATE {

@@ -78,3 +78,7 @@ the same decimals, the last piece ending exactly where the move says) and nothin
 `tests/rotary_axes.rs` walks the levelled program with a simulated machine: at every line that writes X, Y and Z it computes the depth of the tool below the surface of the table (the Z
 written, minus the lift that A and B bring, minus the height of the table) and checks that it is the depth the original program asked for, with the three axes turning inside moves that are
 cut in pieces. Nothing has run on a machine with rotary axes.
+
+## A move that leaves out an axis
+
+The program is taken to start at 0 on every axis, so a move that leaves out X, Y or Z before the program has set it is corrected as if that axis stood at 0. With `unknown-axis = refuse` in the settings file (or `--unknown-axis refuse`) such a move is refused, with the number of the line.

@@ -1,9 +1,9 @@
 //! The settings file of the project: `key = value`, one per line, `#` starts a comment. Today it has five keys: `decimals`, the number of decimals the coordinates of the levelled
-//! program are written with, `max-lines`, the most lines the levelled program may have, and `warn-shift-mm`, the correction of Z above which a warning is shown. The command line takes the same keys as options (`--decimals 3`, `--max-lines 5000`, `--warn-shift 0.3`), which win over the file. `a-axis-compensation` (`off` or `tilt`; `--a-compensation`) and `a-axis-radius-mm` (`--a-radius`) add to Z the tilt that the turn of the axis A brings, and `b-axis-compensation` and `b-axis-radius-mm` (`--b-compensation`, `--b-radius`) the same for the axis B; the axis C turns about Z and needs none. A line that makes no sense is an error that says its number.
+//! program are written with, `max-lines`, the most lines the levelled program may have, and `warn-shift-mm`, the correction of Z above which a warning is shown. The command line takes the same keys as options (`--decimals 3`, `--max-lines 5000`, `--warn-shift 0.3`), which win over the file. `a-axis-compensation` (`off` or `tilt`; `--a-compensation`) and `a-axis-radius-mm` (`--a-radius`) add to Z the tilt that the turn of the axis A brings, and `b-axis-compensation` and `b-axis-radius-mm` (`--b-compensation`, `--b-radius`) the same for the axis B, and `unknown-axis` (`assume-zero` or `refuse`; `--unknown-axis`) says what a move does that leaves out an axis the program has not set yet; the axis C turns about Z and needs none. A line that makes no sense is an error that says its number.
 
 use crate::gcode::{
-    AAxisCompensation, DEFAULT_DECIMALS, DEFAULT_MAX_OUTPUT_LINES, MAX_A_RADIUS_MM, MAX_DECIMALS,
-    MAX_OUTPUT_LINES_LIMIT, MIN_DECIMALS,
+    AAxisCompensation, UnknownAxis, DEFAULT_DECIMALS, DEFAULT_MAX_OUTPUT_LINES, MAX_A_RADIUS_MM,
+    MAX_DECIMALS, MAX_OUTPUT_LINES_LIMIT, MIN_DECIMALS,
 };
 
 /// The largest correction of Z that may be asked for as a warning limit, in mm.
@@ -25,6 +25,8 @@ pub struct Settings {
     pub a_axis_radius_mm: f64,
     pub b_axis_compensation: AAxisCompensation,
     pub b_axis_radius_mm: f64,
+    /// What a move does that leaves out X, Y or Z before the program has set it: `assume-zero` (the program starts at 0, the way it always was) or `refuse`.
+    pub unknown_axis: UnknownAxis,
 }
 
 impl Default for Settings {
@@ -37,6 +39,7 @@ impl Default for Settings {
             a_axis_radius_mm: 0.0,
             b_axis_compensation: AAxisCompensation::Off,
             b_axis_radius_mm: 0.0,
+            unknown_axis: UnknownAxis::AssumeZero,
         }
     }
 }
@@ -74,6 +77,17 @@ pub fn parse_warn_shift(text: &str) -> Result<f64, String> {
         .ok_or_else(|| {
             format!("warn-shift-mm '{text}' must be 0 (no warning) or a number from {MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM} mm")
         })
+}
+
+/// The value of `unknown-axis` as the file or the command line gives it: `assume-zero` or `refuse`.
+pub fn parse_unknown_axis(text: &str) -> Result<UnknownAxis, String> {
+    match text.trim().to_ascii_lowercase().as_str() {
+        "assume-zero" => Ok(UnknownAxis::AssumeZero),
+        "refuse" => Ok(UnknownAxis::Refuse),
+        _ => Err(format!(
+            "unknown-axis '{text}' must be assume-zero or refuse"
+        )),
+    }
 }
 
 /// The value of `a-axis-compensation` as the file or the command line gives it: `off` or `tilt`.
@@ -116,6 +130,7 @@ pub fn parse(text: &str) -> Result<Settings, String> {
     let mut seen_a_radius = false;
     let mut seen_b_comp: Option<usize> = None;
     let mut seen_b_radius = false;
+    let mut seen_unknown_axis = false;
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
         let line = raw.split('#').next().unwrap_or("").trim();
@@ -182,6 +197,14 @@ pub fn parse(text: &str) -> Result<Settings, String> {
                 settings.b_axis_radius_mm =
                     parse_b_radius(value).map_err(|e| format!("line {n}: {e}"))?;
             }
+            "unknown-axis" => {
+                if seen_unknown_axis {
+                    return Err(format!("line {n}: unknown-axis is given twice"));
+                }
+                seen_unknown_axis = true;
+                settings.unknown_axis =
+                    parse_unknown_axis(value).map_err(|e| format!("line {n}: {e}"))?;
+            }
             other => return Err(format!("line {n}: '{other}' is not a setting")),
         }
     }
@@ -205,6 +228,6 @@ pub fn parse(text: &str) -> Result<Settings, String> {
 /// Every setting with its default, as a file that [`parse`] reads back.
 pub fn default_file() -> String {
     format!(
-        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n# warn when the correction of Z passes this many mm up or down ({MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM}, 0 for no warning)\nwarn-shift-mm = 0\n# Z correction for the turn of axis A: off (nothing changes) or tilt (adds radius * (1 - cos A) to Z)\na-axis-compensation = off\n# distance in mm from the axis A to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\na-axis-radius-mm = 0\n# Z correction for the turn of axis B (a turn about Y): off or tilt, the same as for A; the axis C turns about Z and needs none\nb-axis-compensation = off\n# distance in mm from the axis B to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\nb-axis-radius-mm = 0\n"
+        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n# warn when the correction of Z passes this many mm up or down ({MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM}, 0 for no warning)\nwarn-shift-mm = 0\n# Z correction for the turn of axis A: off (nothing changes) or tilt (adds radius * (1 - cos A) to Z)\na-axis-compensation = off\n# distance in mm from the axis A to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\na-axis-radius-mm = 0\n# Z correction for the turn of axis B (a turn about Y): off or tilt, the same as for A; the axis C turns about Z and needs none\nb-axis-compensation = off\n# distance in mm from the axis B to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\nb-axis-radius-mm = 0\n# a move that leaves out X, Y or Z before the program has set it: assume-zero (the program starts at 0) or refuse (the program is refused with the number of the line)\nunknown-axis = assume-zero\n"
     )
 }
