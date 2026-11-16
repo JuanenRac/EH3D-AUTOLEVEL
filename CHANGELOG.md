@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The spindle and coolant words of a cut move go with its first piece:** the controller does `M3`, `M4`, `M5` and the coolant words (`M7` to `M9`) of a block before its motion, but they were written on the last piece, so the first pieces cut with the spindle (or the laser) off, or kept it on after a stop. They now go with the first piece, and the words that end or pause the program (`M0`, `M1`, `M2`, `M30`) stay with the last. README and tests follow.
+
 - **Simulation of a probing session:** add `tests/probe_session.rs`, a twin of the probe node that sends the readings of a simulated table (the same seed gives the same readings) and fails once by plan: no contact, a garbled line, the reading of another point, a spike. A session driver stores only the reading of the point it asked for, tries a point again, stops when the map cannot be completed and resumes from a map saved as text after a cut. Seven tests cover the retry, the refusal of half a map, the lines that are not stored, the resumed session that gives the same map, the spike found by its distance from the plane and measured again, and a point that never touches. Nothing has run on a real probe.
 
 - **The shared validation tools are updated:** the validator also runs the workflow and lessons checks of the suite with their latest rules, including a check to run before every push.

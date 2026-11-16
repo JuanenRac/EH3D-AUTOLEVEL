@@ -434,8 +434,9 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 ));
             }
         }
-        // the M words of a move happen when the move is done (`G1 X50 M5` stops the spindle at X50, not at the first piece): in a cut move they go with the last piece
-        let (m_words, others): (Vec<String>, Vec<String>) = {
+        // the controller does the spindle and coolant words (M3 to M9) of a block BEFORE its motion, and the words that end or pause the program (M0, M1, M2, M30, ...) after it:
+        // in a cut move the first go with the first piece and the second with the last piece
+        let (m_words, others): (Vec<(char, f64)>, Vec<String>) = {
             let rest: Vec<(char, f64)> = w
                 .iter()
                 .filter(|(l, _)| !matches!(l, 'G' | 'X' | 'Y' | 'Z'))
@@ -443,8 +444,20 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 .collect();
             let text = |&(l, v): &(char, f64)| format!("{l}{}", fmt(v));
             (
-                rest.iter().filter(|(l, _)| *l == 'M').map(text).collect(),
+                rest.iter().filter(|(l, _)| *l == 'M').copied().collect(),
                 rest.iter().filter(|(l, _)| *l != 'M').map(text).collect(),
+            )
+        };
+        let (m_first, m_last): (Vec<String>, Vec<String>) = {
+            let before_motion = |&&(_, v): &&(char, f64)| (3.0..10.0).contains(&v);
+            let text = |&(l, v): &(char, f64)| format!("{l}{}", fmt(v));
+            (
+                m_words.iter().filter(before_motion).map(text).collect(),
+                m_words
+                    .iter()
+                    .filter(|m| !before_motion(m))
+                    .map(text)
+                    .collect(),
             )
         };
         let has_z = w.iter().any(|(l, _)| *l == 'Z');
@@ -513,7 +526,8 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 report.moves += 1;
             }
             line.extend(others);
-            line.extend(m_words);
+            line.extend(m_first);
+            line.extend(m_last);
             out.push_str(&line.join(" "));
             out.push('\n');
         } else {
@@ -580,9 +594,13 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     line.push(' ');
                     line.push_str(&others.join(" "));
                 }
-                if k == pieces && !m_words.is_empty() {
+                if k == 1 && !m_first.is_empty() {
                     line.push(' ');
-                    line.push_str(&m_words.join(" "));
+                    line.push_str(&m_first.join(" "));
+                }
+                if k == pieces && !m_last.is_empty() {
+                    line.push(' ');
+                    line.push_str(&m_last.join(" "));
                 }
                 out.push_str(&line);
                 out.push('\n');
