@@ -98,6 +98,38 @@ pub struct Report {
     /// The same for the axis B.
     pub b_corrected: usize,
     pub b_shift_max: f64,
+    /// How many corrected points lie outside the measured area (their height is the one of the nearest edge, which was not measured there).
+    pub outside_points: usize,
+    /// The largest distance, in mm, from a corrected point to the measured area.
+    pub outside_max_mm: f64,
+    /// How far, in mm, the reference point lies from the measured area (0 when it is inside).
+    pub reference_outside_mm: f64,
+}
+
+/// The distance in mm from `(x, y)` to the measured area (0 inside).
+fn distance_outside(grid: &eh3d_levelling::Grid, x: f64, y: f64) -> f64 {
+    let dx = (grid.x0 - x).max(x - grid.x1).max(0.0);
+    let dy = (grid.y0 - y).max(y - grid.y1).max(0.0);
+    dx.hypot(dy)
+}
+
+/// The warning for a program that goes outside the measured area, or whose reference point is outside it: the height there is the one of the nearest edge, which nobody measured.
+/// `None` when everything is inside.
+pub fn outside_warning(report: &Report) -> Option<String> {
+    let mut parts = Vec::new();
+    if report.outside_points > 0 {
+        parts.push(format!(
+            "{} corrected points lie outside the measured area, up to {:.2} mm from it, and use the height of its nearest edge",
+            report.outside_points, report.outside_max_mm
+        ));
+    }
+    if report.reference_outside_mm > 0.0 {
+        parts.push(format!(
+            "the reference point lies {:.2} mm outside the measured area",
+            report.reference_outside_mm
+        ));
+    }
+    (!parts.is_empty()).then(|| parts.join("; "))
 }
 
 /// The notice for a program whose Z was corrected for the turn of the axis A: how many moves and the largest correction. `None` when no move was corrected for it.
@@ -326,7 +358,16 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             opts.max_segment_mm
         ));
     }
+    // the points that lie outside the measured area (line 0 is the reference point)
+    let outside = std::cell::Cell::new((0_usize, 0.0_f64, 0.0_f64));
     let at = |x: f64, y: f64, line: usize| {
+        let away = distance_outside(&map.grid, x, y);
+        let (count, worst, reference) = outside.get();
+        if line == 0 {
+            outside.set((count, worst, away));
+        } else if away > 0.0 {
+            outside.set((count + 1, worst.max(away), reference));
+        }
         height(map, x, y, opts.method)
             .filter(|h| h.is_finite())
             .ok_or_else(|| format!("line {line}: the map has no height at ({x:.3}, {y:.3})"))
@@ -619,5 +660,9 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         report.shift_min = 0.0;
         report.shift_max = 0.0;
     }
+    let (count, worst, reference) = outside.get();
+    report.outside_points = count;
+    report.outside_max_mm = worst;
+    report.reference_outside_mm = reference;
     Ok((out, report))
 }

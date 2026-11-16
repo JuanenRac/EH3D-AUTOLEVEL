@@ -7,7 +7,8 @@ mod cli_args;
 use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::config;
 use eh3d_autolevel::gcode::{
-    a_axis_notice, b_axis_notice, correct, mark_with_header, shift_warning, Options,
+    a_axis_notice, b_axis_notice, correct, mark_with_header, outside_warning, shift_warning,
+    Options,
 };
 use eh3d_autolevel::surface::Method;
 use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
@@ -156,6 +157,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 if let Some(w) = shift_warning(&r, warn_shift) {
                     eprintln!("warning: {w}");
                 }
+                if let Some(w) = outside_warning(&r) {
+                    eprintln!("warning: {w}");
+                }
                 return Ok(());
             }
             // written beside and renamed, so that a program levelled in place is never left half written
@@ -188,6 +192,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 eprintln!("warning: {n}");
             }
             if let Some(w) = shift_warning(&r, warn_shift) {
+                eprintln!("warning: {w}");
+            }
+            if let Some(w) = outside_warning(&r) {
                 eprintln!("warning: {w}");
             }
             Ok(())
