@@ -96,7 +96,7 @@ fn a_move_in_one_piece_and_a_program_without_rotary_words_are_written_as_before(
     let out = level("G0 X0 Y0\nG1 X10 F100 M5\n", 5.0);
     assert_eq!(
         out,
-        "G0 X0.000 Y0.000\nG1 X5.000 Y0.000 Z0.005 F100\nG1 X10.000 Y0.000 Z0.010 M5\n"
+        "G0 X0.000 Y0.000\nG1 X5.000 Y0.000 Z0.005 F100 M5\nG1 X10.000 Y0.000 Z0.010\n"
     );
 }
 
