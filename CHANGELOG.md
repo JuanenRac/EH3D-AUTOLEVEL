@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The README says the maturity of the manifest:** the badge and the Maturity row of the eight READMEs read functional, as the manifest does, and the check of the status lights now fails when they differ.
 - **A program that goes outside the measured area is warned about:** the report counts the corrected points that lie outside the grid (and the largest distance from it) and says how far the reference point is from it; `correct` and its dry run print one warning, because there the height is the one of the nearest edge, which was not measured.
 - **The spindle and coolant words of a cut move go with its first piece:** the controller does `M3`, `M4`, `M5` and the coolant words (`M7` to `M9`) of a block before its motion, but they were written on the last piece, so the first pieces cut with the spindle (or the laser) off, or kept it on after a stop. They now go with the first piece, and the words that end or pause the program (`M0`, `M1`, `M2`, `M30`) stay with the last. README and tests follow.
 
