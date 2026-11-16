@@ -180,19 +180,33 @@ fn lines_that_are_not_moves_pass_through_and_a_checksum_is_not_a_word() {
 }
 
 #[test]
-fn the_m_words_of_a_cut_move_go_with_its_last_piece_and_the_rest_with_the_first() {
+fn the_spindle_words_of_a_cut_move_go_with_its_first_piece_and_the_ending_words_with_the_last() {
     let opts = Options {
         max_segment_mm: 25.0,
         ..Options::default()
     };
-    let (out, _) = correct("G0 X0 Y0\nG1 X50 F200 M5\n", &plane(0.001, 0.0), &opts).unwrap();
+    // the controller starts or stops the spindle of a block before the motion of that block
+    let (out, _) = correct(
+        "G0 X0 Y0\nG1 X50 F200 M3 S1000 M30\n",
+        &plane(0.001, 0.0),
+        &opts,
+    )
+    .unwrap();
     let cuts: Vec<&str> = out.lines().filter(|l| l.starts_with("G1")).collect();
     assert_eq!(cuts.len(), 2, "{out}");
-    assert!(cuts[0].contains("F200") && !cuts[0].contains("M5"), "{out}");
     assert!(
-        cuts[1].ends_with("M5") && !cuts[1].contains("F200"),
+        cuts[0].contains("F200") && cuts[0].contains("S1000") && cuts[0].contains("M3"),
         "{out}"
     );
+    assert!(!cuts[0].contains("M30"), "{out}");
+    assert!(
+        cuts[1].ends_with("M30") && !cuts[1].contains("M3 ") && !cuts[1].contains("F200"),
+        "{out}"
+    );
+    // a stop of the spindle in a cut move happens before the motion, as in the original block
+    let (out, _) = correct("G0 X0 Y0\nG1 X50 F200 M5\n", &plane(0.001, 0.0), &opts).unwrap();
+    let cuts: Vec<&str> = out.lines().filter(|l| l.starts_with("G1")).collect();
+    assert!(cuts[0].contains("M5") && !cuts[1].contains("M5"), "{out}");
     // a move that is not cut has everything on its only line
     let (one, _) = correct("G0 X0 Y0\nG1 X5 F200 M5\n", &plane(0.001, 0.0), &opts).unwrap();
     assert!(
