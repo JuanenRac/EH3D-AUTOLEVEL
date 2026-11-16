@@ -28,6 +28,7 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 --decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
+--unknown-axis refuse (assume-zero by default: the program starts at 0 on every axis) refuses a move that leaves out X, Y or Z before the program has set it, with the number of the line; the key of the file is `unknown-axis`.
 --warn-shift MM (0 by default: no warning; otherwise 0.001 to 100) shows a warning on the error output when the correction of Z passes MM up or down; the program is written all the same. The key in the file is `warn-shift-mm`.
 --a-compensation tilt (off by default) adds r * (1 - cos A) to Z for the turn of the axis A, with r from --a-radius MM (-1000 to 1000, not 0); the keys of the file are `a-axis-compensation` and `a-axis-radius-mm`, and the options win over the file. The axis B (a turn about Y) has the same with --b-compensation tilt and --b-radius MM (`b-axis-compensation`, `b-axis-radius-mm`) and the two add up; the axis C turns about Z and needs none (its words are carried like A and B). A notice on the error output says when it was applied.
 A, B and C are interpolated like X and Y when a cutting move is cut in pieces.
@@ -77,6 +78,11 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 opts.a_radius_mm = settings.a_axis_radius_mm;
                 opts.b_compensation = settings.b_axis_compensation;
                 opts.b_radius_mm = settings.b_axis_radius_mm;
+                opts.unknown_axis = settings.unknown_axis;
+            }
+            if let Some(u) = flag(&mut args, "--unknown-axis")? {
+                opts.unknown_axis =
+                    config::parse_unknown_axis(&u).map_err(|e| format!("--unknown-axis: {e}"))?;
             }
             if let Some(c) = flag(&mut args, "--a-compensation")? {
                 opts.a_compensation = config::parse_a_compensation(&c)
