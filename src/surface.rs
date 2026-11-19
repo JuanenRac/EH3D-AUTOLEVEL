@@ -114,8 +114,8 @@ pub fn spikes(map: &HeightMap, limit_mm: f64) -> Vec<Spike> {
         deviation[row as usize * g.cols + col as usize].map_or(0.0, |d| d.2)
     };
     let mut out = Vec::new();
-    for index in 0..g.len() {
-        let Some((z, expected, dev)) = deviation[index] else {
+    for (index, d) in deviation.iter().enumerate() {
+        let Some((z, expected, dev)) = *d else {
             continue;
         };
         let (col, row) = (index % g.cols, index / g.cols);
