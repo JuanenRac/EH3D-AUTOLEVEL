@@ -705,3 +705,25 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
     report.reference_outside_mm = reference;
     Ok((out, report))
 }
+
+/// What `apply --json` prints: one JSON object with what the correction did (the fields of [`Report`]), whether it was a dry run and how many points of the map read
+/// above or below their neighbours by more than the limit.
+pub fn report_json(report: &Report, dry_run: bool, map_spikes: usize) -> String {
+    use crate::surface::json_number as n;
+    format!(
+        "{{\"dry_run\":{},\"moves\":{},\"pieces_added\":{},\"shift_min\":{},\"shift_max\":{},\"a_corrected\":{},\"a_shift_max\":{},\"b_corrected\":{},\"b_shift_max\":{},\"outside_points\":{},\"outside_max_mm\":{},\"reference_outside_mm\":{},\"map_spikes\":{}}}",
+        dry_run,
+        report.moves,
+        report.pieces_added,
+        n(report.shift_min),
+        n(report.shift_max),
+        report.a_corrected,
+        n(report.a_shift_max),
+        report.b_corrected,
+        n(report.b_shift_max),
+        report.outside_points,
+        n(report.outside_max_mm),
+        n(report.reference_outside_mm),
+        map_spikes
+    )
+}

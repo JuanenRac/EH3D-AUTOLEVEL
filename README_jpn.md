@@ -17,7 +17,7 @@
 
 ---
 
-**正直さの確認 - 現在実際に動くもの：** Rust ライブラリとコマンドライン プログラム（`eh3d-autolevel`）で、コンピューター上で実行される 192 件のテストがあります：テーブルの高さマップで G コード プログラムの Z を補正し、移動を表面に沿った短い区間に分割します。ウィンドウ（`--features gui` でビルド）はG コード プログラムと高さマップを開き、テーブルを色付きメッシュで表示してその上に補正後のパスを重ね、書き出すが、画面ではまだ確認しておらず、機械では試しておらず、実際のファイルの集まりでも確認していません。
+**正直さの確認 - 現在実際に動くもの：** Rust ライブラリとコマンドライン プログラム（`eh3d-autolevel`）で、コンピューター上で実行される 220 件のテストがあります：テーブルの高さマップで G コード プログラムの Z を補正し、移動を表面に沿った短い区間に分割します。ウィンドウ（`--features gui` でビルド）はG コード プログラムと高さマップを開き、テーブルを色付きメッシュで表示してその上に補正後のパスを重ね、書き出すが、画面ではまだ確認しておらず、機械では試しておらず、実際のファイルの集まりでも確認していません。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | バージョン | `0.0.9` |
 | 成熟度 | 機能する |
-| テスト | 192 |
+| テスト | 220 |
 | 技術スタック | Rust |
 | 実機での動作 | 未試験：ここにあるものは機械で動かしたことがありません |
 
@@ -46,7 +46,7 @@
 |---|---|---|
 | コア | 🟡 | テーブルの高さマップで G コード プログラムの Z を補正し、移動を表面に沿った短い区間に分割します。コンピューター上で通常入力と破損入力でテスト済み。実際のファイルの集まりでは未確認。 |
 | コマンドライン | 🟡 | `eh3d-autolevel` はライブラリと同じ関数を実行して結果を表示します。エラーはメッセージと 0 以外の終了コードで返ります。 |
-| テスト | 🟡 | 192 件のテストが通ります（`cargo test`）。通常ケース、境界ケース、破損入力を含みます。固定シードによるプローブノードの障害を含む測定セッションのシミュレーション（障害の注入と復旧を含む）も含まれます。 |
+| テスト | 🟡 | 220 件のテストが通ります（`cargo test`）。通常ケース、境界ケース、破損入力を含みます。固定シードによるプローブノードの障害を含む測定セッションのシミュレーション（障害の注入と復旧を含む）も含まれます。 |
 | セキュリティ | 🟡 | 安全な Rust のみ（`forbid(unsafe_code)`）。受け取ったファイルでパニックせず、不正な値は理由付きのエラーになります。独立したレビューはありません。 |
 | ウィンドウ | 🟠 | 作成済み（egui、`--features gui`）：プログラムと高さマップを開くかドロップ、テーブルのシミュレート、色付きメッシュのテーブルと補正後のパスの表示、拡大縮小と移動、補正の設定、書き出し。ロジックはテスト済みですが、まだビルドも画面での確認もしていません。 |
 | 実機 | 🔴 | 未試験：ここにあるものは機械で実行したことがありません。 |
@@ -94,6 +94,7 @@ EH3D-AUTOLEVEL は EH3D Fabrication Suite のプログラムの一つです。�
 * **A 軸の回転による Z 補正：** `a-axis-compensation = tilt` と `a-axis-radius-mm = r`（または `--a-compensation tilt --a-radius r`）を指定すると、書き出す各移動の Z に、テーブルの高さの後で `r * (1 - cos A)` が加算されます。A は移動が残す角度（度）で、片ごとに補間されます。既定は `off` で、出力は一切変わらず、適用されたときはエラー出力に通知が表示されます。式は `docs/a-axis-compensation.md` にあります。
 * **B軸とC軸：** B軸（Y周りの回転）にはA軸と同じ補正があり、専用の半径を持ちます（ファイルでは `b-axis-compensation = tilt` と `b-axis-radius-mm`、コマンドラインでは `--b-compensation` と `--b-radius`）。両方の補正は加算されます。C軸はZ周りの回転で高さを変えないため補正は不要です（その語はAやBと同様に引き継がれ補間されます）。シミュレートした機械がレベリング後のプログラムをたどってテーブル下の深さを確認します。回転軸を持つ実機では何も実行していません。 **軸を省略した移動:** 既定ではプログラムはすべての軸で 0 から始まるものとして扱います。`unknown-axis = refuse`（`--unknown-axis refuse`）にすると、プログラムが設定する前に X、Y、Z を省略した移動を、行番号つきで拒否します。
 * **レベリング後のプログラムは標準ヘッダで始まります:** 生成元とそのバージョン、単位、元のプログラムとそのSHA-256、工具が、印の前のコメント行として入ります。テストは結果をスイートのリーダーで読み直し、警告、材料への早送り、スピンドルが止まったままの切削が1つも見つからないことを確かめます。
+* **疑わしい測定値、マップの粗さ、未測定の点：** `info` と `apply` は、隣接する点から得られる値より `--spike MM`（または設定ファイルの `spike-mm`、0〜10 mm、既定は 0.1、0 で確認なし）を超えて高いまたは低い点（滑ったプローブ、先端の下の切りくず）を表示します。最もずれている点だけを一覧し、`apply` を止めることはありません。`info` はさらに、グリッドの範囲と間隔、粗さ（最も近い平面までの距離の二乗平均平方根）、未測定の点の番号も表示します。`--json` は `info` または `apply` の結果を他のプログラム向けに 1 つの JSON オブジェクトとして表示し、`demo-map` は `--noise MM`、`--seed N`、`--bad 列,行,MM` を受け付けて、読み取り誤差と不良点を含む模擬マップを作り、確認を試せるようにします。コンピューター上でのみテストしています。
 
 ## 🔒 セキュリティと安全
 
@@ -110,16 +111,16 @@ EH3D-AUTOLEVEL は EH3D Fabrication Suite のプログラムの一つです。�
 ライブラリは `eh3d_autolevel`（`use eh3d_autolevel::...`）、コマンドラインは `eh3d-autolevel` です。コマンドは次のとおりで、結果は標準出力に表示され、エラーは標準エラー出力に 0 以外の終了コードで報告されます。ネットワークアクセスはありません。
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--config FILE] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
 eh3d-autolevel config                            every setting with its default, as a file
-eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
-eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
 eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ 設定
 
-調整する価値のある値は小さな設定ファイル（`キー = 値`、1行に1つ、`#` からコメント）に置きます。現在のキーは5つあります。`decimals` は補正後プログラムの X、Y、Z を何桁の小数で書くか（既定は3、1〜6）、`max-lines` は補正後プログラムの最大行数（既定は 5000000、1〜100000000）を決めます。`eh3d-autolevel config` はすべての既定値を含むファイルを出力し（`examples/autolevel.cfg` がそのファイルです）、`--config FILE` はファイルを読み、`--decimals N` と `--max-lines N` は同じキーをコマンドラインで与えてファイルより優先されます。意味のない値は、その行番号を示すエラーになります。それ以外はコマンドラインの引数で渡し（インターフェースを参照）、各既定値はコマンドのヘルプ（`eh3d-autolevel help`）に書かれています。固定の上限はコード内の名前付き定数で、テストで確認されています。 `warn-shift-mm` は、これを超える Z 補正があると `apply` がエラー出力に警告を表示する値（mm）です（既定は 0 で警告なし、0.001〜100）。コマンドラインの `--warn-shift MM` が設定ファイルより優先され、補正後のプログラムはそのまま書き出されます。`a-axis-compensation`（`off` または `tilt`、既定は `off`、オプションは `--a-compensation`）と `a-axis-radius-mm`（A 軸から切削点までの距離 mm、-1000〜1000 で、`tilt` では 0 以外、オプションは `--a-radius`）は、A 軸の回転で生じる補正を Z に加えます（`docs/a-axis-compensation.md` を参照）。オプションは設定ファイルより優先されます。
+調整する価値のある値は小さな設定ファイル（`キー = 値`、1行に1つ、`#` からコメント）に置きます。現在のキーは5つあります。`decimals` は補正後プログラムの X、Y、Z を何桁の小数で書くか（既定は3、1〜6）、`max-lines` は補正後プログラムの最大行数（既定は 5000000、1〜100000000）を決めます。`eh3d-autolevel config` はすべての既定値を含むファイルを出力し（`examples/autolevel.cfg` がそのファイルです）、`--config FILE` はファイルを読み、`--decimals N` と `--max-lines N` は同じキーをコマンドラインで与えてファイルより優先されます。意味のない値は、その行番号を示すエラーになります。それ以外はコマンドラインの引数で渡し（インターフェースを参照）、各既定値はコマンドのヘルプ（`eh3d-autolevel help`）に書かれています。固定の上限はコード内の名前付き定数で、テストで確認されています。 `warn-shift-mm` は、これを超える Z 補正があると `apply` がエラー出力に警告を表示する値（mm）です（既定は 0 で警告なし、0.001〜100）。コマンドラインの `--warn-shift MM` が設定ファイルより優先され、補正後のプログラムはそのまま書き出されます。`a-axis-compensation`（`off` または `tilt`、既定は `off`、オプションは `--a-compensation`）と `a-axis-radius-mm`（A 軸から切削点までの距離 mm、-1000〜1000 で、`tilt` では 0 以外、オプションは `--a-radius`）は、A 軸の回転で生じる補正を Z に加えます（`docs/a-axis-compensation.md` を参照）。オプションは設定ファイルより優先されます。 `spike-mm` は、`apply` と `info` が疑わしい測定値として表示する前に、マップの点が隣接点から得られる値と異なってよい量（mm、既定は 0.1、0〜10、0 で確認なし）です。コマンドラインでは `--spike MM` で指定でき、ファイルより優先されます。
 
 ## 🚀 クイックスタート
 
@@ -137,7 +138,7 @@ cargo run --release --features gui -- --shot screen.png examples/sample.nc   # a
 
 ## 🧪 テスト
 
-テストは 192 件あります（`cargo test`、CI では Windows と Linux で実行）。通常ケース、境界ケース、破損入力を確認し、空のファイル、ゴミデータ、途中で切れたファイルでもパニックしません。CI は `cargo fmt --check`、警告をエラーにした `cargo clippy`、`python -I tools/ci_validate.py` も実行します。
+テストは 220 件あります（`cargo test`、CI では Windows と Linux で実行）。通常ケース、境界ケース、破損入力を確認し、空のファイル、ゴミデータ、途中で切れたファイルでもパニックしません。CI は `cargo fmt --check`、警告をエラーにした `cargo clippy`、`python -I tools/ci_validate.py` も実行します。
 
 ## 🏗️ ビルドとリリース
 

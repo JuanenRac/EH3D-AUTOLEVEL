@@ -10,6 +10,10 @@ use crate::gcode::{
 pub const MAX_WARN_SHIFT_MM: f64 = 100.0;
 /// The smallest correction of Z that may be asked for as a warning limit, in mm (0 gives no warning).
 pub const MIN_WARN_SHIFT_MM: f64 = 0.001;
+/// The most a point of the map may differ from its neighbours before it is shown as a doubtful reading, in mm that may be asked for (0 gives no check).
+pub const MAX_SPIKE_MM: f64 = 10.0;
+/// The default of that limit, in mm.
+pub const DEFAULT_SPIKE_MM: f64 = 0.1;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
@@ -27,6 +31,8 @@ pub struct Settings {
     pub b_axis_radius_mm: f64,
     /// What a move does that leaves out X, Y or Z before the program has set it: `assume-zero` (the program starts at 0, the way it always was) or `refuse`.
     pub unknown_axis: UnknownAxis,
+    /// How far, in mm, a point of the map may read from what its neighbours give before `apply` and `info` show it as a doubtful reading; from 0 to 10, 0 gives no check.
+    pub spike_mm: f64,
 }
 
 impl Default for Settings {
@@ -40,8 +46,22 @@ impl Default for Settings {
             b_axis_compensation: AAxisCompensation::Off,
             b_axis_radius_mm: 0.0,
             unknown_axis: UnknownAxis::AssumeZero,
+            spike_mm: DEFAULT_SPIKE_MM,
         }
     }
+}
+
+/// The value of the doubtful-reading limit as the file or the command line gives it: from 0 (no check) to 10 mm.
+pub fn parse_spike(text: &str) -> Result<f64, String> {
+    text.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite() && (0.0..=MAX_SPIKE_MM).contains(v))
+        .ok_or_else(|| {
+            format!(
+                "spike-mm '{text}' must be a number from 0 to {MAX_SPIKE_MM} mm (0 for no check)"
+            )
+        })
 }
 
 /// The value of `decimals` as the file or the command line gives it: a whole number from 1 to 6.
@@ -131,6 +151,7 @@ pub fn parse(text: &str) -> Result<Settings, String> {
     let mut seen_b_comp: Option<usize> = None;
     let mut seen_b_radius = false;
     let mut seen_unknown_axis = false;
+    let mut seen_spike = false;
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
         let line = raw.split('#').next().unwrap_or("").trim();
@@ -205,6 +226,13 @@ pub fn parse(text: &str) -> Result<Settings, String> {
                 settings.unknown_axis =
                     parse_unknown_axis(value).map_err(|e| format!("line {n}: {e}"))?;
             }
+            "spike-mm" => {
+                if seen_spike {
+                    return Err(format!("line {n}: spike-mm is given twice"));
+                }
+                seen_spike = true;
+                settings.spike_mm = parse_spike(value).map_err(|e| format!("line {n}: {e}"))?;
+            }
             other => return Err(format!("line {n}: '{other}' is not a setting")),
         }
     }
@@ -228,6 +256,6 @@ pub fn parse(text: &str) -> Result<Settings, String> {
 /// Every setting with its default, as a file that [`parse`] reads back.
 pub fn default_file() -> String {
     format!(
-        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n# warn when the correction of Z passes this many mm up or down ({MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM}, 0 for no warning)\nwarn-shift-mm = 0\n# Z correction for the turn of axis A: off (nothing changes) or tilt (adds radius * (1 - cos A) to Z)\na-axis-compensation = off\n# distance in mm from the axis A to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\na-axis-radius-mm = 0\n# Z correction for the turn of axis B (a turn about Y): off or tilt, the same as for A; the axis C turns about Z and needs none\nb-axis-compensation = off\n# distance in mm from the axis B to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\nb-axis-radius-mm = 0\n# a move that leaves out X, Y or Z before the program has set it: assume-zero (the program starts at 0) or refuse (the program is refused with the number of the line)\nunknown-axis = assume-zero\n"
+        "# EH3D-AUTOLEVEL settings\n# decimals of X, Y and Z in the levelled program ({MIN_DECIMALS} to {MAX_DECIMALS})\ndecimals = {DEFAULT_DECIMALS}\n# the most lines the levelled program may have (1 to {MAX_OUTPUT_LINES_LIMIT})\nmax-lines = {DEFAULT_MAX_OUTPUT_LINES}\n# warn when the correction of Z passes this many mm up or down ({MIN_WARN_SHIFT_MM} to {MAX_WARN_SHIFT_MM}, 0 for no warning)\nwarn-shift-mm = 0\n# Z correction for the turn of axis A: off (nothing changes) or tilt (adds radius * (1 - cos A) to Z)\na-axis-compensation = off\n# distance in mm from the axis A to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\na-axis-radius-mm = 0\n# Z correction for the turn of axis B (a turn about Y): off or tilt, the same as for A; the axis C turns about Z and needs none\nb-axis-compensation = off\n# distance in mm from the axis B to the point that is cut, used by tilt (-{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}, not 0 for tilt)\nb-axis-radius-mm = 0\n# a move that leaves out X, Y or Z before the program has set it: assume-zero (the program starts at 0) or refuse (the program is refused with the number of the line)\nunknown-axis = assume-zero\n# show a point of the map that reads this many mm above or below what its neighbours give, as a doubtful reading (0 to {MAX_SPIKE_MM}, 0 for no check)\nspike-mm = {DEFAULT_SPIKE_MM}\n"
     )
 }

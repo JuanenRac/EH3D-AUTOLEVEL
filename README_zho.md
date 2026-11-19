@@ -17,7 +17,7 @@
 
 ---
 
-**诚实检查 - 当前真正能运行的内容：** 一个 Rust 库和一个命令行程序（`eh3d-autolevel`），有 192 个在电脑上运行的测试：用工作台高度图修正 G 代码程序的 Z 值，并把移动切成沿表面的小段。有一个窗口（用 `--features gui` 构建），可以打开 G 代码程序和高度图，把工作台显示为彩色网格并在其上叠加校平后的路径，还能导出，但窗口尚未在屏幕上看过，没有在机器上试过，也没有用大量真实文件验证过。
+**诚实检查 - 当前真正能运行的内容：** 一个 Rust 库和一个命令行程序（`eh3d-autolevel`），有 220 个在电脑上运行的测试：用工作台高度图修正 G 代码程序的 Z 值，并把移动切成沿表面的小段。有一个窗口（用 `--features gui` 构建），可以打开 G 代码程序和高度图，把工作台显示为彩色网格并在其上叠加校平后的路径，还能导出，但窗口尚未在屏幕上看过，没有在机器上试过，也没有用大量真实文件验证过。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | 版本 | `0.0.9` |
 | 成熟度 | 可用 |
-| 测试 | 192 |
+| 测试 | 220 |
 | 技术栈 | Rust |
 | 真实硬件 | 未试过：这里的任何内容都没有在机器上运行过 |
 
@@ -46,7 +46,7 @@
 |---|---|---|
 | 核心 | 🟡 | 用工作台高度图修正 G 代码程序的 Z 值，并把移动切成沿表面的小段；已在电脑上用正常和损坏的输入测试，未用大量真实文件验证。 |
 | 命令行 | 🟡 | `eh3d-autolevel` 运行与库相同的函数并打印结果；每个错误都以消息和非零退出码返回。 |
-| 测试 | 🟡 | 192 个测试通过（`cargo test`），包含正常情况、边界情况和损坏的输入。其中包括对含探测节点故障的探测会话的固定种子模拟，含注入故障与恢复。 |
+| 测试 | 🟡 | 220 个测试通过（`cargo test`），包含正常情况、边界情况和损坏的输入。其中包括对含探测节点故障的探测会话的固定种子模拟，含注入故障与恢复。 |
 | 安全 | 🟡 | 纯安全 Rust（`forbid(unsafe_code)`）：处理收到的文件时不会 panic，错误的值会返回带原因的错误；没有独立审查。 |
 | 窗口 | 🟠 | 已编写（egui，`--features gui`）：打开或拖入程序和高度图、模拟工作台、以彩色网格查看工作台和校平后的路径、缩放和平移、设置校平参数、导出；其逻辑已测试，但尚未构建，也尚未在屏幕上看过。 |
 | 真实硬件 | 🔴 | 未试过：这里的任何内容都没有在机器上运行过。 |
@@ -94,6 +94,7 @@ EH3D-AUTOLEVEL 是 EH3D Fabrication Suite 的一个程序。它以库和命令�
 * **A 轴转动的 Z 补偿：** 使用 `a-axis-compensation = tilt` 和 `a-axis-radius-mm = r`（或 `--a-compensation tilt --a-radius r`）时，每条写出的移动的 Z 在工作台高度之后再加上 `r * (1 - cos A)`，A 以度为单位，取移动结束时的值（逐段插值）；默认为 `off`，不会改变任何输出，应用时会在错误输出上给出提示。公式见 `docs/a-axis-compensation.md`。
 * **B 轴和 C 轴：** B 轴（绕 Y 轴旋转）有与 A 轴相同的补偿，并有自己的半径（文件中为 `b-axis-compensation = tilt` 和 `b-axis-radius-mm`，命令行为 `--b-compensation` 和 `--b-radius`），两者相加；C 轴绕 Z 轴旋转，不改变高度，因此不需要补偿（其字与 A、B 一样被保留并插值）。模拟机床会遍历校平后的程序并检查工作台下的深度；尚未在带旋转轴的机床上运行过。 **省略了某个轴的移动：** 默认认为程序在每个轴上都从 0 开始；`unknown-axis = refuse`（`--unknown-axis refuse`）会在程序尚未设置 X、Y 或 Z 时，拒绝省略该轴的移动，并给出行号。
 * **校平后的程序以标准文件头开头:** 生成程序及其版本、单位、来源程序及其 SHA-256 和刀具,作为标记之前的注释行;测试用套件的读取器重新读取结果,找不到任何警告、进入材料的快速移动或主轴停转时的切削。
+* **可疑读数、地图的粗糙度和未测量的点：** `info` 和 `apply` 会显示地图中读数比其相邻点所给出的值高出或低出超过 `--spike MM`（或设置文件中的 `spike-mm`，0 至 10 mm，默认 0.1，0 表示不检查）的点（探针打滑、针尖下有碎屑），只列出偏离最大的点，并且绝不会中止 `apply`；`info` 还会输出网格的范围和间距、粗糙度（到最接近平面的距离的均方根）以及未测量点的编号。`--json` 将 `info` 或 `apply` 的结果作为单个 JSON 对象输出，供其他程序使用；`demo-map` 接受 `--noise MM`、`--seed N` 和 `--bad 列,行,MM`，用于生成带有读数误差和一个坏点的模拟地图，以便试验该检查。仅在计算机上测试过。
 
 ## 🔒 安全与防护
 
@@ -110,16 +111,16 @@ EH3D-AUTOLEVEL 是 EH3D Fabrication Suite 的一个程序。它以库和命令�
 库为 `eh3d_autolevel`（`use eh3d_autolevel::...`），命令行为 `eh3d-autolevel`。命令如下；每个命令把结果打印到标准输出，把错误以非零退出码报告到标准错误。没有网络访问。
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--config FILE] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
 eh3d-autolevel config                            every setting with its default, as a file
-eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
-eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
 eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ 配置
 
-一个小的设置文件（`键 = 值`，每行一个，`#` 开始注释）保存值得调整的内容；目前有五个键：`decimals`，校平后程序中 X、Y、Z 写成几位小数（默认 3，范围 1 到 6）；`max-lines`，校平后程序最多有多少行（默认 5000000，范围 1 到 100000000）。`eh3d-autolevel config` 会打印带有所有默认值的文件（`examples/autolevel.cfg` 就是该文件），`--config FILE` 读取文件，`--decimals N` 和 `--max-lines N` 在命令行给出同样的键并优先于文件。无意义的值会报错并指出其行号。其余内容通过命令行参数给出（见接口），每个默认值都写在命令的帮助中（`eh3d-autolevel help`）。固定的限制是代码中的具名常量，并有测试覆盖。 `warn-shift-mm` 是 Z 修正量（毫米）的上限，超过时 `apply` 会在错误输出上显示警告（默认 0：不警告；范围 0.001 到 100）；命令行的 `--warn-shift MM` 优先于文件，修正后的程序照常写出。`a-axis-compensation`（`off` 或 `tilt`，默认 `off`，选项 `--a-compensation`）和 `a-axis-radius-mm`（A 轴到切削点的距离，单位毫米，范围 -1000 到 1000，`tilt` 时不能为 0，选项 `--a-radius`）会把 A 轴转动带来的修正量加到 Z 上（见 `docs/a-axis-compensation.md`）；选项优先于文件。
+一个小的设置文件（`键 = 值`，每行一个，`#` 开始注释）保存值得调整的内容；目前有五个键：`decimals`，校平后程序中 X、Y、Z 写成几位小数（默认 3，范围 1 到 6）；`max-lines`，校平后程序最多有多少行（默认 5000000，范围 1 到 100000000）。`eh3d-autolevel config` 会打印带有所有默认值的文件（`examples/autolevel.cfg` 就是该文件），`--config FILE` 读取文件，`--decimals N` 和 `--max-lines N` 在命令行给出同样的键并优先于文件。无意义的值会报错并指出其行号。其余内容通过命令行参数给出（见接口），每个默认值都写在命令的帮助中（`eh3d-autolevel help`）。固定的限制是代码中的具名常量，并有测试覆盖。 `warn-shift-mm` 是 Z 修正量（毫米）的上限，超过时 `apply` 会在错误输出上显示警告（默认 0：不警告；范围 0.001 到 100）；命令行的 `--warn-shift MM` 优先于文件，修正后的程序照常写出。`a-axis-compensation`（`off` 或 `tilt`，默认 `off`，选项 `--a-compensation`）和 `a-axis-radius-mm`（A 轴到切削点的距离，单位毫米，范围 -1000 到 1000，`tilt` 时不能为 0，选项 `--a-radius`）会把 A 轴转动带来的修正量加到 Z 上（见 `docs/a-axis-compensation.md`）；选项优先于文件。 `spike-mm` 是地图中某个点的读数与其相邻点所给出的值相差多少（mm，默认 0.1，范围 0 至 10；0 表示不检查）时，`apply` 和 `info` 才会把它显示为可疑读数；命令行中用 `--spike MM` 指定，优先于文件。
 
 ## 🚀 快速开始
 
@@ -137,7 +138,7 @@ cargo run --release --features gui -- --shot screen.png examples/sample.nc   # a
 
 ## 🧪 测试
 
-测试套件有 192 个测试（`cargo test`，CI 在 Windows 和 Linux 上运行）。它们检查正常情况、边界情况和损坏的输入：空文件、乱码和被截断的文件绝不会 panic。CI 还运行 `cargo fmt --check`、把警告当作错误的 `cargo clippy` 以及 `python -I tools/ci_validate.py`。
+测试套件有 220 个测试（`cargo test`，CI 在 Windows 和 Linux 上运行）。它们检查正常情况、边界情况和损坏的输入：空文件、乱码和被截断的文件绝不会 panic。CI 还运行 `cargo fmt --check`、把警告当作错误的 `cargo clippy` 以及 `python -I tools/ci_validate.py`。
 
 ## 🏗️ 构建与发布
 

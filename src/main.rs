@@ -7,10 +7,10 @@ mod cli_args;
 use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::config;
 use eh3d_autolevel::gcode::{
-    a_axis_notice, b_axis_notice, correct, mark_with_header, outside_warning, shift_warning,
-    Options,
+    a_axis_notice, b_axis_notice, correct, mark_with_header, outside_warning, report_json,
+    shift_warning, Options,
 };
-use eh3d_autolevel::surface::Method;
+use eh3d_autolevel::surface::{map_json, missing, rms_from_plane, spike_text, spikes, Method};
 use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
 use std::env;
@@ -19,14 +19,16 @@ use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
 
-  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--config FILE] [--dry-run]
+  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
   eh3d-autolevel config                            every setting with its default, as a file
-  eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
-  eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+  eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
+  eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
   eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui): with no arguments, with files (a program, a map) or with gui it opens; the commands above never open it
   eh3d-autolevel gui [FILE...] --shot OUT.png [--size WxH] [--theme forge|dark|light] [--wait N] [--lang CODE] [--replace]   a picture of the window (a build with --features gui)
 
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
+--spike MM (0.1 by default, 0 to 10; 0 gives no check) shows, on the error output, a point of the map that reads more than MM above or below what its neighbours give (a probe that slipped, a chip under the tip): the program is written all the same. The key of the file is `spike-mm`. info lists the same points. --json prints the result of apply or of info as one JSON object, for other programs, instead of the sentence.
+--noise MM and --seed N of demo-map add to every point of the simulated table a reading error of up to MM (0 to 1; the same seed gives the same map) and --bad COL,ROW,MM adds MM to one point (COL and ROW from 1): a map to try the check of doubtful readings on.
 --decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
 --unknown-axis refuse (assume-zero by default: the program starts at 0 on every axis) refuses a move that leaves out X, Y or Z before the program has set it, with the number of the line; the key of the file is `unknown-axis`.
 --warn-shift MM (0 by default: no warning; otherwise 0.001 to 100) shows a warning on the error output when the correction of Z passes MM up or down; the program is written all the same. The key in the file is `warn-shift-mm`.
@@ -54,6 +56,17 @@ fn same_file(a: &str, b: &str) -> bool {
     }
 }
 
+/// A reading error of the simulated table: up to `amplitude` mm either way, from a small generator (xorshift) that the same seed repeats.
+fn reading_error(state: &mut u64, amplitude: f64) -> f64 {
+    if amplitude == 0.0 {
+        return 0.0;
+    }
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    ((*state % 20_001) as f64 / 10_000.0 - 1.0) * amplitude
+}
+
 fn run(mut args: Vec<String>) -> Result<(), String> {
     if args.is_empty() || matches!(args[0].as_str(), "help" | "--help" | "-h") {
         println!("{HELP}");
@@ -68,6 +81,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
         "apply" => {
             let mut opts = Options::default();
             let mut warn_shift = 0.0;
+            let mut spike = config::DEFAULT_SPIKE_MM;
             if let Some(path) = flag(&mut args, "--config")? {
                 let text = read_text(&path)?;
                 let settings = config::parse(&text).map_err(|e| format!("{path}: {e}"))?;
@@ -79,6 +93,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 opts.b_compensation = settings.b_axis_compensation;
                 opts.b_radius_mm = settings.b_axis_radius_mm;
                 opts.unknown_axis = settings.unknown_axis;
+                spike = settings.spike_mm;
             }
             if let Some(u) = flag(&mut args, "--unknown-axis")? {
                 opts.unknown_axis =
@@ -104,6 +119,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 warn_shift =
                     config::parse_warn_shift(&w).map_err(|e| format!("--warn-shift: {e}"))?;
             }
+            if let Some(s) = flag(&mut args, "--spike")? {
+                spike = config::parse_spike(&s).map_err(|e| format!("--spike: {e}"))?;
+            }
             if let Some(d) = flag(&mut args, "--decimals")? {
                 opts.decimals =
                     config::parse_decimals(&d).map_err(|e| format!("--decimals: {e}"))?;
@@ -128,6 +146,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 opts.method = Method::Bicubic;
             }
             let dry_run = switch(&mut args, "--dry-run");
+            let json = switch(&mut args, "--json");
             let needed = if dry_run { 2 } else { 3 };
             if args.len() < needed {
                 return Err(if dry_run {
@@ -147,13 +166,21 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             let map = load_map(&args[0])?;
             let text = read_text(&args[1])?;
             let (out, r) = correct(&text, &map, &opts)?;
+            let doubtful = spikes(&map, spike);
+            for s in &doubtful {
+                eprintln!("warning: {}", spike_text(s));
+            }
             let summary = format!(
                 "{} moves corrected, {} pieces added, Z shifted from {:+.4} to {:+.4} mm",
                 r.moves, r.pieces_added, r.shift_min, r.shift_max
             );
             if dry_run {
                 // the program is corrected and counted, and nothing is written
-                println!("dry run, nothing written: {summary}");
+                if json {
+                    println!("{}", report_json(&r, true, doubtful.len()));
+                } else {
+                    println!("dry run, nothing written: {summary}");
+                }
                 if let Some(n) = a_axis_notice(&r, &opts) {
                     eprintln!("warning: {n}");
                 }
@@ -190,7 +217,11 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 let _ = fs::remove_file(&tmp);
                 format!("{}: {e}", args[2])
             })?;
-            println!("{summary}");
+            if json {
+                println!("{}", report_json(&r, false, doubtful.len()));
+            } else {
+                println!("{summary}");
+            }
             if let Some(n) = a_axis_notice(&r, &opts) {
                 eprintln!("warning: {n}");
             }
@@ -211,18 +242,69 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             Ok(())
         }
         "info" => {
+            let spike = match flag(&mut args, "--spike")? {
+                Some(s) => config::parse_spike(&s).map_err(|e| format!("--spike: {e}"))?,
+                None => config::DEFAULT_SPIKE_MM,
+            };
+            let json = switch(&mut args, "--json");
             finish(&args, 1)?;
             let map = load_map(args.first().ok_or("info needs a map")?)?;
+            let doubtful = spikes(&map, spike);
+            if json {
+                println!("{}", map_json(&map, spike));
+                return Ok(());
+            }
             println!("{} of {} points measured", map.measured(), map.grid.len());
+            let g = &map.grid;
+            let (sx, sy) = g.step();
+            println!(
+                "{} by {} points over X {:.3} to {:.3} mm and Y {:.3} to {:.3} mm, {:.3} by {:.3} mm apart",
+                g.cols, g.rows, g.x0, g.x1, g.y0, g.y1, sx, sy
+            );
             if let Some((lo, hi, spread)) = map.spread() {
                 println!("lowest {lo:+.4} mm, highest {hi:+.4} mm, spread {spread:.4} mm");
             }
             if let Some((tx, ty)) = map.tilt_mm_per_m() {
                 println!("tilt {tx:+.3} mm/m along X, {ty:+.3} mm/m along Y");
             }
+            if let Some(rms) = rms_from_plane(&map) {
+                println!(
+                    "roughness (root mean square distance from the closest plane) {rms:.4} mm"
+                );
+            }
+            let absent = missing(&map);
+            if !absent.is_empty() {
+                let shown: Vec<String> = absent.iter().take(10).map(|i| i.to_string()).collect();
+                println!(
+                    "{} points not measured: {}{}",
+                    absent.len(),
+                    shown.join(", "),
+                    if absent.len() > 10 { ", ..." } else { "" }
+                );
+            }
+            for s in &doubtful {
+                println!("doubtful reading: {}", spike_text(s));
+            }
             Ok(())
         }
         "demo-map" => {
+            let noise = match flag(&mut args, "--noise")? {
+                Some(v) => {
+                    let n = num(&v, "--noise")?;
+                    if !(0.0..=1.0).contains(&n) {
+                        return Err(format!("--noise {v} must be from 0 to 1 mm"));
+                    }
+                    n
+                }
+                None => 0.0,
+            };
+            let seed = match flag(&mut args, "--seed")? {
+                Some(v) => v
+                    .parse::<u64>()
+                    .map_err(|_| format!("--seed '{v}' is not a whole number"))?,
+                None => 1,
+            };
+            let bad = flag(&mut args, "--bad")?;
             if args.len() < 7 {
                 return Err("demo-map needs OUT X0 Y0 X1 Y1 COLS ROWS".into());
             }
@@ -242,10 +324,33 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 cols,
                 rows,
             ));
+            let mut state = seed ^ 0x9E37_79B9_7F4A_7C15;
             for i in 0..map.grid.len() {
                 let (x, y) = map.grid.point(i);
-                map.set(i, simulated_table(x, y))
+                map.set(i, simulated_table(x, y) + reading_error(&mut state, noise))
                     .map_err(|e| e.to_string())?;
+            }
+            if let Some(b) = bad {
+                let parts: Vec<&str> = b.split(',').collect();
+                let [c, r, d] = parts[..] else {
+                    return Err("--bad needs COL,ROW,MM".into());
+                };
+                let whole = |t: &str, what: &str| {
+                    t.trim()
+                        .parse::<usize>()
+                        .ok()
+                        .filter(|v| *v >= 1)
+                        .ok_or_else(|| format!("--bad {what} '{t}' is not a whole number from 1"))
+                };
+                let (c, r) = (whole(c, "COL")?, whole(r, "ROW")?);
+                if c > cols || r > rows {
+                    return Err(format!(
+                        "--bad {c},{r} is outside the map of {cols} by {rows} points"
+                    ));
+                }
+                let i = (r - 1) * cols + (c - 1);
+                let z = map.get(i).unwrap_or(0.0) + num(d, "--bad MM")?;
+                map.set(i, z).map_err(|e| e.to_string())?;
             }
             fs::write(&args[0], map.to_text()).map_err(|e| format!("{}: {e}", args[0]))?;
             println!("{} points written to {}", map.grid.len(), args[0]);

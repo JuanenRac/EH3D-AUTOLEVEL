@@ -17,7 +17,7 @@
 
 ---
 
-**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 192 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
+**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 220 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.0.9` |
 | Madurez | Funcional |
-| Pruebas | 192 |
+| Pruebas | 220 |
 | Pila tecnológica | Rust |
 | En hardware real | No probado: nada de esto se ha ejecutado en una máquina |
 
@@ -46,7 +46,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 |---|---|---|
 | Núcleo | 🟡 | corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie; probado en un ordenador con entradas normales y dañadas, no con una colección de ficheros reales. |
 | Línea de comandos | 🟡 | `eh3d-autolevel` ejecuta las mismas funciones que la biblioteca e imprime el resultado; cada error vuelve como mensaje y un código de salida distinto de cero. |
-| Pruebas | 🟡 | 192 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. Incluyen una simulación con semilla fija de una sesión de palpado con los fallos del nodo palpador, con fallos inyectados y recuperación. |
+| Pruebas | 🟡 | 220 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. Incluyen una simulación con semilla fija de una sesión de palpado con los fallos del nodo palpador, con fallos inyectados y recuperación. |
 | Seguridad | 🟡 | Rust seguro y simple (`forbid(unsafe_code)`): nada entra en pánico con los ficheros recibidos y un valor malo es un error con su motivo; sin revisión independiente. |
 | Ventana | 🟠 | Escrita (egui, `--features gui`): abrir o soltar un programa y un mapa de alturas, simular una mesa, ver la mesa como malla coloreada y las trayectorias niveladas, zoom y desplazamiento, ajustar la nivelación, exportar; su lógica está probada, pero todavía no se ha compilado ni visto en una pantalla. |
 | Hardware real | 🔴 | No probado: nada de esto se ha ejecutado en una máquina. |
@@ -94,6 +94,7 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 * **Compensación de Z por el giro del eje A:** con `a-axis-compensation = tilt` y `a-axis-radius-mm = r` (o `--a-compensation tilt --a-radius r`), a la Z de cada movimiento escrito se le suma `r * (1 - cos A)` después de la altura de la mesa, con A en grados tal como la deja el movimiento (interpolada pieza a pieza); por defecto es `off`, que no cambia ninguna salida, y un aviso por la salida de errores dice cuándo se aplicó. La fórmula está en `docs/a-axis-compensation.md`.
 * **Los ejes B y C:** el eje B (un giro sobre Y) tiene la misma compensación con su propio radio (`b-axis-compensation = tilt` y `b-axis-radius-mm` en el fichero, `--b-compensation` y `--b-radius`) y las dos se suman; el eje C gira sobre Z, no cambia ninguna altura y no necesita ninguna (sus palabras se llevan e interpolan como las de A y B). Una máquina simulada recorre el programa nivelado y comprueba la profundidad bajo la mesa; nada se ha ejecutado en una máquina con ejes rotativos. **Un movimiento que omite un eje:** por defecto se toma que el programa empieza en 0 en cada eje; `unknown-axis = refuse` (`--unknown-axis refuse`) rechaza, con el número de la línea, un movimiento que omite X, Y o Z antes de que el programa lo haya fijado.
 * **El programa nivelado empieza con la cabecera estándar:** el generador y su versión, las unidades, el programa de origen con su SHA-256 y las herramientas, como líneas de comentario antes de la marca; las pruebas vuelven a leer el resultado con el lector de la suite y no encuentran ningún aviso, ningún movimiento rápido dentro del material ni ningún corte con el husillo parado.
+* **Lecturas dudosas, la rugosidad del mapa y los puntos sin medir:** `info` y `apply` muestran un punto del mapa que marca más de `--spike MM` (o `spike-mm` en el fichero de ajustes, de 0 a 10 mm, 0,1 por defecto, 0 para no comprobar) por encima o por debajo de lo que dan sus vecinos (una sonda que resbaló, una viruta bajo la punta), listando solo el punto que más se aparta y sin detener nunca `apply`; `info` imprime además el área y el espaciado de la rejilla, la rugosidad (la distancia cuadrática media al plano más próximo) y los números de los puntos que no se midieron. `--json` imprime el resultado de `info` o de `apply` como un único objeto JSON para otros programas, y `demo-map` admite `--noise MM`, `--seed N` y `--bad COL,FILA,MM` para hacer un mapa simulado con errores de lectura y un punto malo, de modo que la comprobación pueda probarse. Probado solo en un ordenador.
 
 ## 🔒 Seguridad y protección
 
@@ -110,16 +111,16 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 La biblioteca es `eh3d_autolevel` (`use eh3d_autolevel::...`); la línea de comandos es `eh3d-autolevel`. Las órdenes son estas; cada una imprime su resultado por la salida estándar e informa de un error por la salida de errores con un código de salida distinto de cero. No hay acceso a la red.
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--config FILE] [--dry-run]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
 eh3d-autolevel config                            every setting with its default, as a file
-eh3d-autolevel info MAP.txt                      how many points, the spread and the tilt of the table
-eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS    a map of a simulated tilted table with a bump
+eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
+eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
 eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui); with no arguments it opens
 ```
 
 ## ⚙️ Configuración
 
-Un pequeño fichero de ajustes (`clave = valor`, uno por línea, `#` empieza un comentario) guarda lo que merece afinarse; hoy tiene cinco claves: `decimals`, cuántos decimales se escriben en X, Y y Z del programa nivelado (3 por defecto, de 1 a 6), y `max-lines`, el máximo de líneas que puede tener el programa nivelado (5000000 por defecto, de 1 a 100000000). `eh3d-autolevel config` imprime el fichero con cada valor por defecto (`examples/autolevel.cfg` es ese fichero), `--config FICHERO` lee uno y `--decimals N` y `--max-lines N` dan las mismas claves en la línea de comandos y ganan al fichero. Un valor sin sentido es un error que dice su línea. Lo demás se da como argumentos de la línea de comandos (véase Interfaces) y cada valor por defecto está escrito en la ayuda de la orden (`eh3d-autolevel help`). Los límites fijos están en el código como constantes con nombre y las pruebas los cubren. `warn-shift-mm` es la corrección de Z, en mm, a partir de la cual `apply` muestra un aviso por la salida de errores (0 por defecto: sin aviso; de 0,001 a 100); `--warn-shift MM` la da en la línea de órdenes y gana al fichero, y el programa corregido se escribe igualmente. `a-axis-compensation` (`off` o `tilt`, por defecto `off`; `--a-compensation`) y `a-axis-radius-mm` (la distancia en mm del eje A al corte, de -1000 a 1000 y distinta de 0 con `tilt`; `--a-radius`) suman a Z la corrección que trae el giro del eje A (véase `docs/a-axis-compensation.md`); las opciones ganan al fichero.
+Un pequeño fichero de ajustes (`clave = valor`, uno por línea, `#` empieza un comentario) guarda lo que merece afinarse; hoy tiene cinco claves: `decimals`, cuántos decimales se escriben en X, Y y Z del programa nivelado (3 por defecto, de 1 a 6), y `max-lines`, el máximo de líneas que puede tener el programa nivelado (5000000 por defecto, de 1 a 100000000). `eh3d-autolevel config` imprime el fichero con cada valor por defecto (`examples/autolevel.cfg` es ese fichero), `--config FICHERO` lee uno y `--decimals N` y `--max-lines N` dan las mismas claves en la línea de comandos y ganan al fichero. Un valor sin sentido es un error que dice su línea. Lo demás se da como argumentos de la línea de comandos (véase Interfaces) y cada valor por defecto está escrito en la ayuda de la orden (`eh3d-autolevel help`). Los límites fijos están en el código como constantes con nombre y las pruebas los cubren. `warn-shift-mm` es la corrección de Z, en mm, a partir de la cual `apply` muestra un aviso por la salida de errores (0 por defecto: sin aviso; de 0,001 a 100); `--warn-shift MM` la da en la línea de órdenes y gana al fichero, y el programa corregido se escribe igualmente. `a-axis-compensation` (`off` o `tilt`, por defecto `off`; `--a-compensation`) y `a-axis-radius-mm` (la distancia en mm del eje A al corte, de -1000 a 1000 y distinta de 0 con `tilt`; `--a-radius`) suman a Z la corrección que trae el giro del eje A (véase `docs/a-axis-compensation.md`); las opciones ganan al fichero. `spike-mm` es cuánto, en mm, puede marcar un punto del mapa respecto de lo que dan sus vecinos antes de que `apply` e `info` lo muestren como lectura dudosa (0,1 por defecto, de 0 a 10; 0 no comprueba); `--spike MM` lo da en la línea de órdenes y gana al fichero.
 
 ## 🚀 Inicio rápido
 
@@ -137,7 +138,7 @@ Para sacar una captura de la ventana sin abrirla a mano, ejecútelo con `--shot 
 
 ## 🧪 Pruebas
 
-El conjunto tiene 192 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
+El conjunto tiene 220 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilación y publicación
 
