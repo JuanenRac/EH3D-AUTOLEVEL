@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The CI and the release build take the shared libraries at their newest releases:** the pins of the sibling repositories in the workflows are raised to the releases the program now needs, so that the build and the binaries of a release use them.
 ## [0.0.9] - Refusal of moves that leave out an axis, warnings outside the measured area and a probing simulation
 
 - **A setting to refuse a move that leaves out an axis the program has not set:** `unknown-axis = refuse` in the settings file (or `--unknown-axis refuse`) refuses, with the number of the line, a move that leaves out X, Y or Z before the program has set it; the default `assume-zero` is the way it always was (the program starts at 0 on every axis). Tests cover both, the reading of the setting and its place in the default file; the README says it in the eight languages.
