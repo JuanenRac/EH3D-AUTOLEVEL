@@ -4,11 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.0] - Doubtful readings of the map, extra information and noisy demo maps
+
 - **A point of the map that reads far from its neighbours is shown as a doubtful reading:** `apply` (on the error output, before it writes the program, which it writes all the same) and `info` list a point that reads more than `--spike MM` (or `spike-mm` in the settings file, from 0 to 10 mm, 0.1 by default, 0 for no check) above or below what its neighbours give: along each axis with both neighbours measured, the mean of the pair, then the mean of the axes, which is exact for any plane. A probe that slipped or a chip under the tip is the likely cause. Only the point that is furthest off of the ones around it is listed, a corner is never judged and a point whose neighbours were not measured is skipped.
 - **`info` tells more about the map:** the grid (columns, rows, area and spacing), the roughness (the root mean square distance of the measured points from the closest plane, 0 for a plane) and the numbers of the points that were not measured (the first ten, with how many there are).
 - **`--json` for `info` and `apply`:** one JSON object instead of the sentence, for other programs to read: the grid, the spread, the tilt, the roughness, the points not measured and the doubtful readings for `info`, and what the correction did (moves, pieces, the range of the shift, the rotary and outside counts, whether it was a dry run) with the number of doubtful readings for `apply`; a number that is not finite is `null`.
 - **`demo-map` can make a map with reading errors:** `--noise MM` adds to every point of the simulated table an error of up to MM (0 to 1), `--seed N` makes the same map every time and `--bad COL,ROW,MM` adds MM to one point, so that the check of doubtful readings and the rest of the chain can be tried without a probe.
 - **The CI and the release build take the shared libraries at their newest releases:** the pins of the sibling repositories in the workflows are raised to the releases the program now needs, so that the build and the binaries of a release use them.
+
 ## [0.0.9] - Refusal of moves that leave out an axis, warnings outside the measured area and a probing simulation
 
 - **A setting to refuse a move that leaves out an axis the program has not set:** `unknown-axis = refuse` in the settings file (or `--unknown-axis refuse`) refuses, with the number of the line, a move that leaves out X, Y or Z before the program has set it; the default `assume-zero` is the way it always was (the program starts at 0 on every axis). Tests cover both, the reading of the setting and its place in the default file; the README says it in the eight languages.
