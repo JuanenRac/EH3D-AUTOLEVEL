@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] - Send levelled programs and maps to the EH3D server
+
 - **A server mode over the client of the suite:** the settings file takes the keys `server_address`, `server_token`, `server_machine`, `server_timeout_s` (1 to 120, 15 by default), `server_retries` (0 to 5, 2 by default), `server_mdns` (`off` by default) and `server_max_answer_mib` (1 to 256, 8 by default), read with their ranges by `eh3d-serverclient` of EH3D-COMMON; a value out of its range, a key given twice or a space in the address is an error that says its line; the mode is off until `server_address` is set and the local work never depends on it.
 - **`eh3d-autolevel server status`:** shows the link (the token as `***`) and what the server answers at `/health`, with the refusals and the failures of the network told by their code in the language of the system (taken from `LC_ALL`, `LC_MESSAGES` or `LANG`).
 - **`apply --to-server` keeps the corrected program on the server:** the G-code that `apply` writes is kept on the EH3D server as an artifact once it is written locally (one request, never repeated by the client), with the map, the program, the method, the moves, the pieces added, the shift of Z and the decimals as its parameters; the option is refused before any work when `--config` has no `server_address` or `server_token`, and with `--dry-run`, which writes nothing; a refusal of the server is told after the local file was written.
