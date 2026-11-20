@@ -17,7 +17,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 220 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 238 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.0` |
 | Maturity | Functional |
-| Tests | 220 |
+| Tests | 238 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -46,7 +46,7 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 220 tests pass (`cargo test`), with normal cases, edge cases and damaged input. They include a seeded simulation of a probing session with the faults of the probe node with injected faults and recovery. |
+| Tests | 🟡 | 238 tests pass (`cargo test`), with normal cases, edge cases and damaged input. They include a seeded simulation of a probing session with the faults of the probe node with injected faults and recovery. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
 | Window | 🟠 | Written (egui, `--features gui`): open or drop a program and a height map, simulate a table, see the table as a coloured mesh and the levelled paths, zoom and pan, set the levelling, export; its logic is tested, but it has not been built or looked at on a screen yet. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
@@ -122,6 +122,8 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 A small settings file (`key = value`, one per line, `#` starts a comment) holds what is worth tuning; today it has five keys: `decimals`, how many decimals X, Y and Z are written with in the levelled program (3 by default, from 1 to 6), and `max-lines`, the most lines the levelled program may have (5000000 by default, from 1 to 100000000). `eh3d-autolevel config` prints the file with every default (`examples/autolevel.cfg` is that file), `--config FILE` reads one and `--decimals N` and `--max-lines N` give the same keys on the command line and win over the file. A value that makes no sense is an error that says its line. The rest is given as arguments of the command line (see Interfaces) and every default is written in the help of the command (`eh3d-autolevel help`). The fixed limits live in the code as named constants and are covered by tests. `warn-shift-mm` is the correction of Z, in mm, above which `apply` shows a warning on the error output (0 by default: no warning; from 0.001 to 100); `--warn-shift MM` gives it on the command line and wins over the file, and the corrected program is written all the same. `a-axis-compensation` (`off` or `tilt`, `off` by default; `--a-compensation`) and `a-axis-radius-mm` (the distance in mm from the axis A to the cut, from -1000 to 1000 and not 0 for `tilt`; `--a-radius`) add to Z the correction that the turn of the axis A brings (see `docs/a-axis-compensation.md`); the options win over the file. `spike-mm` is how far, in mm, a point of the map may read from what its neighbours give before `apply` and `info` show it as a doubtful reading (0.1 by default, from 0 to 10; 0 gives no check); `--spike MM` gives it on the command line and wins over the file.
 
+**Server mode.** `apply --to-server` keeps the corrected program on the EH3D server as an artifact, with the map, the method and the figures of the run, `info --json --to-server` keeps the JSON of the map, and `demo-map --to-server` keeps the map it has just written, so the other programs of the suite (the height map is read by ISOCAM too) find them there. The link is the one client of the suite (`eh3d-serverclient` of EH3D-COMMON) and its keys go in the settings file: `server_address` (`host:port`; empty means off), `server_token` (write-only, never shown), `server_machine`, `server_timeout_s` (1 to 120, 15 by default), `server_retries` (0 to 5, 2 by default), `server_mdns` (`off` by default) and `server_max_answer_mib` (1 to 256, 8 by default). The refusals of the server are told by their code in the language of the system. `eh3d-autolevel server status --config FILE` shows the settings (the token as `***`) and what the server answers. Nothing is sent without an address and the local work never depends on the server.
+
 ## 🚀 Quick start
 
 You need a stable Rust toolchain (1.88 or newer).
@@ -138,7 +140,7 @@ To take a picture of the window without opening it by hand, run it with `--shot 
 
 ## 🧪 Testing
 
-The suite has 220 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 238 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 

@@ -10,9 +10,11 @@ use eh3d_autolevel::gcode::{
     a_axis_notice, b_axis_notice, correct, mark_with_header, outside_warning, report_json,
     shift_warning, Options,
 };
+use eh3d_autolevel::server;
 use eh3d_autolevel::surface::{map_json, missing, rms_from_plane, spike_text, spikes, Method};
 use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
+use eh3d_serverclient::Settings as LinkSettings;
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -21,11 +23,13 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 
   eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
   eh3d-autolevel config                            every setting with its default, as a file
+  eh3d-autolevel server [status] [--config FILE]   the link to the EH3D server (server_address, server_token, server_machine, server_timeout_s, server_retries, server_mdns and server_max_answer_mib of the settings file) and what the server answers
   eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
   eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
   eh3d-autolevel [gui] [FILE...]                   the window (a build with --features gui): with no arguments, with files (a program, a map) or with gui it opens; the commands above never open it
   eh3d-autolevel gui [FILE...] --shot OUT.png [--size WxH] [--theme forge|dark|light] [--wait N] [--lang CODE] [--replace]   a picture of the window (a build with --features gui)
 
+--to-server (apply, info --json and demo-map) keeps the corrected program, the JSON of info or the map on the EH3D server as an artifact, with the values of the run; it needs --config FILE with server_address and server_token and is refused before any work when they are missing (and with --dry-run, which writes nothing).
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
 --spike MM (0.1 by default, 0 to 10; 0 gives no check) shows, on the error output, a point of the map that reads more than MM above or below what its neighbours give (a probe that slipped, a chip under the tip): the program is written all the same. The key of the file is `spike-mm`. info lists the same points. --json prints the result of apply or of info as one JSON object, for other programs, instead of the sentence.
 --noise MM and --seed N of demo-map add to every point of the simulated table a reading error of up to MM (0 to 1; the same seed gives the same map) and --bad COL,ROW,MM adds MM to one point (COL and ROW from 1): a map to try the check of doubtful readings on.
@@ -67,6 +71,63 @@ fn reading_error(state: &mut u64, amplitude: f64) -> f64 {
     ((*state % 20_001) as f64 / 10_000.0 - 1.0) * amplitude
 }
 
+/// The link to the EH3D server for `--to-server`: the keys of the settings file, which must name a server and hold its token.
+fn link_settings(config: Option<&str>) -> Result<LinkSettings, String> {
+    let path =
+        config.ok_or("--to-server needs --config FILE with server_address and server_token")?;
+    let settings = server::settings_from_file(path)?;
+    server::require(&settings)?;
+    Ok(settings)
+}
+
+/// `server [status] [--config FILE]`: the link, with the token as `***`, and what the server answers.
+fn server_command(mut args: Vec<String>) -> Result<(), String> {
+    let config = flag(&mut args, "--config")?;
+    let word = args.first().cloned().unwrap_or_else(|| "status".into());
+    finish(&args, 1)?;
+    if word != "status" {
+        return Err(format!("server {word}: unknown (use: server status)"));
+    }
+    let settings = match config {
+        Some(path) => server::settings_from_file(&path)?,
+        None => LinkSettings::default(),
+    };
+    print!("{}", server::status_report(settings)?);
+    Ok(())
+}
+
+/// Keeps a file on the server and says so; the file was already written, so a refusal is told as such.
+fn keep(
+    link: &LinkSettings,
+    name: &str,
+    format: &str,
+    data: &[u8],
+    params: &[(&str, &str)],
+) -> Result<(), String> {
+    let line = server::keep(link.clone(), name, format, data, params)
+        .map_err(|e| format!("{name}: not kept on the server: {e}"))?;
+    println!("{line}");
+    Ok(())
+}
+
+/// The last part of a path, as text.
+fn file_name_of(path: &str) -> String {
+    std::path::Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("file")
+        .to_string()
+}
+
+/// The name of a path without its extension.
+fn stem_of(path: &str) -> String {
+    std::path::Path::new(path)
+        .file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("file")
+        .to_string()
+}
+
 fn run(mut args: Vec<String>) -> Result<(), String> {
     if args.is_empty() || matches!(args[0].as_str(), "help" | "--help" | "-h") {
         println!("{HELP}");
@@ -77,13 +138,17 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
         // a build with the window never gets here (main opens it): this one is only a command line
         return Err("this build has no window: build it with --features gui".into());
     }
+    if cmd == "server" {
+        return server_command(args);
+    }
     match cmd.as_str() {
         "apply" => {
             let mut opts = Options::default();
             let mut warn_shift = 0.0;
             let mut spike = config::DEFAULT_SPIKE_MM;
-            if let Some(path) = flag(&mut args, "--config")? {
-                let text = read_text(&path)?;
+            let config_path = flag(&mut args, "--config")?;
+            if let Some(path) = &config_path {
+                let text = read_text(path)?;
                 let settings = config::parse(&text).map_err(|e| format!("{path}: {e}"))?;
                 opts.decimals = settings.decimals;
                 opts.max_output_lines = settings.max_lines;
@@ -147,6 +212,18 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             }
             let dry_run = switch(&mut args, "--dry-run");
             let json = switch(&mut args, "--json");
+            let to_server = switch(&mut args, "--to-server");
+            if to_server && dry_run {
+                return Err(
+                    "--to-server keeps the corrected program, and --dry-run writes none".into(),
+                );
+            }
+            // the link is checked before any work is done
+            let link = if to_server {
+                Some(link_settings(config_path.as_deref())?)
+            } else {
+                None
+            };
             let needed = if dry_run { 2 } else { 3 };
             if args.len() < needed {
                 return Err(if dry_run {
@@ -197,26 +274,24 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             }
             // written beside and renamed, so that a program levelled in place is never left half written
             let tmp = format!("{}.tmp", args[2]);
-            fs::write(
-                &tmp,
-                mark_with_header(
-                    &out,
-                    &map,
-                    &opts,
-                    Some((
-                        std::path::Path::new(&args[1])
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("program"),
-                        text.as_str(),
-                    )),
-                ),
-            )
-            .and_then(|()| fs::rename(&tmp, &args[2]))
-            .map_err(|e| {
-                let _ = fs::remove_file(&tmp);
-                format!("{}: {e}", args[2])
-            })?;
+            let corrected = mark_with_header(
+                &out,
+                &map,
+                &opts,
+                Some((
+                    std::path::Path::new(&args[1])
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("program"),
+                    text.as_str(),
+                )),
+            );
+            fs::write(&tmp, &corrected)
+                .and_then(|()| fs::rename(&tmp, &args[2]))
+                .map_err(|e| {
+                    let _ = fs::remove_file(&tmp);
+                    format!("{}: {e}", args[2])
+                })?;
             if json {
                 println!("{}", report_json(&r, false, doubtful.len()));
             } else {
@@ -234,6 +309,41 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if let Some(w) = outside_warning(&r) {
                 eprintln!("warning: {w}");
             }
+            if let Some(link) = &link {
+                let figures = [
+                    r.moves.to_string(),
+                    r.pieces_added.to_string(),
+                    format!("{:+.4}", r.shift_min),
+                    format!("{:+.4}", r.shift_max),
+                    opts.decimals.to_string(),
+                    opts.max_segment_mm.to_string(),
+                ];
+                let method = if matches!(opts.method, Method::Bicubic) {
+                    "bicubic"
+                } else {
+                    "bilinear"
+                };
+                let map_name = file_name_of(&args[0]);
+                let program_name = file_name_of(&args[1]);
+                keep(
+                    link,
+                    &args[2],
+                    server::media_type(&args[2]),
+                    corrected.as_bytes(),
+                    &[
+                        ("command", "apply"),
+                        ("map", map_name.as_str()),
+                        ("program", program_name.as_str()),
+                        ("method", method),
+                        ("moves", figures[0].as_str()),
+                        ("pieces_added", figures[1].as_str()),
+                        ("shift_min_mm", figures[2].as_str()),
+                        ("shift_max_mm", figures[3].as_str()),
+                        ("decimals", figures[4].as_str()),
+                        ("segment_mm", figures[5].as_str()),
+                    ],
+                )?;
+            }
             Ok(())
         }
         "config" => {
@@ -242,16 +352,38 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             Ok(())
         }
         "info" => {
+            let config_path = flag(&mut args, "--config")?;
             let spike = match flag(&mut args, "--spike")? {
                 Some(s) => config::parse_spike(&s).map_err(|e| format!("--spike: {e}"))?,
                 None => config::DEFAULT_SPIKE_MM,
             };
             let json = switch(&mut args, "--json");
+            let to_server = switch(&mut args, "--to-server");
+            if to_server && !json {
+                return Err("--to-server is an option of info --json".into());
+            }
+            // the link is checked before any work is done
+            let link = if to_server {
+                Some(link_settings(config_path.as_deref())?)
+            } else {
+                None
+            };
             finish(&args, 1)?;
             let map = load_map(args.first().ok_or("info needs a map")?)?;
             let doubtful = spikes(&map, spike);
             if json {
-                println!("{}", map_json(&map, spike));
+                let report = map_json(&map, spike);
+                println!("{report}");
+                if let Some(link) = &link {
+                    let spike_text = spike.to_string();
+                    keep(
+                        link,
+                        &format!("{}.info.json", stem_of(&args[0])),
+                        "application/json",
+                        report.as_bytes(),
+                        &[("command", "info"), ("spike_mm", spike_text.as_str())],
+                    )?;
+                }
                 return Ok(());
             }
             println!("{} of {} points measured", map.measured(), map.grid.len());
@@ -288,6 +420,14 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             Ok(())
         }
         "demo-map" => {
+            let config_path = flag(&mut args, "--config")?;
+            let to_server = switch(&mut args, "--to-server");
+            // the link is checked before any work is done
+            let link = if to_server {
+                Some(link_settings(config_path.as_deref())?)
+            } else {
+                None
+            };
             let noise = match flag(&mut args, "--noise")? {
                 Some(v) => {
                     let n = num(&v, "--noise")?;
@@ -354,6 +494,20 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             }
             fs::write(&args[0], map.to_text()).map_err(|e| format!("{}: {e}", args[0]))?;
             println!("{} points written to {}", map.grid.len(), args[0]);
+            if let Some(link) = &link {
+                let (cols_text, rows_text) = (cols.to_string(), rows.to_string());
+                keep(
+                    link,
+                    &args[0],
+                    server::media_type(&args[0]),
+                    map.to_text().as_bytes(),
+                    &[
+                        ("command", "demo-map"),
+                        ("cols", cols_text.as_str()),
+                        ("rows", rows_text.as_str()),
+                    ],
+                )?;
+            }
             Ok(())
         }
         other => Err(format!("{other}: unknown command (see help)")),

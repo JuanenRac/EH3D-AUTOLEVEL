@@ -1,5 +1,5 @@
 //! The settings file of the project: `key = value`, one per line, `#` starts a comment. Today it has five keys: `decimals`, the number of decimals the coordinates of the levelled
-//! program are written with, `max-lines`, the most lines the levelled program may have, and `warn-shift-mm`, the correction of Z above which a warning is shown. The command line takes the same keys as options (`--decimals 3`, `--max-lines 5000`, `--warn-shift 0.3`), which win over the file. `a-axis-compensation` (`off` or `tilt`; `--a-compensation`) and `a-axis-radius-mm` (`--a-radius`) add to Z the tilt that the turn of the axis A brings, and `b-axis-compensation` and `b-axis-radius-mm` (`--b-compensation`, `--b-radius`) the same for the axis B, and `unknown-axis` (`assume-zero` or `refuse`; `--unknown-axis`) says what a move does that leaves out an axis the program has not set yet; the axis C turns about Z and needs none. A line that makes no sense is an error that says its number.
+//! program are written with, `max-lines`, the most lines the levelled program may have, and `warn-shift-mm`, the correction of Z above which a warning is shown. The command line takes the same keys as options (`--decimals 3`, `--max-lines 5000`, `--warn-shift 0.3`), which win over the file. `a-axis-compensation` (`off` or `tilt`; `--a-compensation`) and `a-axis-radius-mm` (`--a-radius`) add to Z the tilt that the turn of the axis A brings, and `b-axis-compensation` and `b-axis-radius-mm` (`--b-compensation`, `--b-radius`) the same for the axis B, and `unknown-axis` (`assume-zero` or `refuse`; `--unknown-axis`) says what a move does that leaves out an axis the program has not set yet; the axis C turns about Z and needs none. The keys `server_address`, `server_token`, `server_machine`, `server_timeout_s`, `server_retries`, `server_mdns` and `server_max_answer_mib` set the link to the EH3D server (see `server`). A line that makes no sense is an error that says its number.
 
 use crate::gcode::{
     AAxisCompensation, UnknownAxis, DEFAULT_DECIMALS, DEFAULT_MAX_OUTPUT_LINES, MAX_A_RADIUS_MM,
@@ -152,6 +152,8 @@ pub fn parse(text: &str) -> Result<Settings, String> {
     let mut seen_b_radius = false;
     let mut seen_unknown_axis = false;
     let mut seen_spike = false;
+    // the keys of the link to the EH3D server are read by `server::settings_from_file`; here they are only checked
+    let mut seen_server: Vec<&str> = Vec::new();
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
         let line = raw.split('#').next().unwrap_or("").trim();
@@ -232,6 +234,13 @@ pub fn parse(text: &str) -> Result<Settings, String> {
                 }
                 seen_spike = true;
                 settings.spike_mm = parse_spike(value).map_err(|e| format!("line {n}: {e}"))?;
+            }
+            other if crate::server::is_server_key(other) => {
+                crate::server::check_key(other, value).map_err(|e| format!("line {n}: {e}"))?;
+                if seen_server.contains(&other) {
+                    return Err(format!("line {n}: {other} is given twice"));
+                }
+                seen_server.push(other);
             }
             other => return Err(format!("line {n}: '{other}' is not a setting")),
         }

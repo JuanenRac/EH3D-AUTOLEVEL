@@ -17,7 +17,7 @@
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 220 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Tem uma janela (compilada com `--features gui`) que abre um programa G-code e um mapa de alturas, mostra a mesa como uma malha colorida com as trajetórias niveladas por cima e exporta, mas a janela ainda não foi vista num ecrã; não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
+**Verificação de honestidade - o que funciona hoje:** uma biblioteca Rust e um programa de linha de comandos (`eh3d-autolevel`) com 238 testes que correm num computador: corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície. Tem uma janela (compilada com `--features gui`) que abre um programa G-code e um mapa de alturas, mostra a mesa como uma malha colorida com as trajetórias niveladas por cima e exporta, mas a janela ainda não foi vista num ecrã; não foi experimentado numa máquina e não foi verificado com uma coleção de ficheiros reais.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versão | `0.1.0` |
 | Maturidade | Funcional |
-| Testes | 220 |
+| Testes | 238 |
 | Tecnologias | Rust |
 | Em hardware real | Não experimentado: nada disto correu numa máquina |
 
@@ -46,7 +46,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 |---|---|---|
 | Núcleo | 🟡 | corrige o Z de um programa G-code com o mapa de alturas da mesa, partindo os movimentos em pedaços que seguem a superfície; testado num computador com entradas normais e danificadas, não com uma coleção de ficheiros reais. |
 | Linha de comandos | 🟡 | `eh3d-autolevel` executa as mesmas funções da biblioteca e imprime o resultado; cada erro volta como mensagem e código de saída diferente de zero. |
-| Testes | 🟡 | 220 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. Incluem uma simulação com semente fixa de uma sessão de apalpação com as falhas do nó apalpador, com falhas injetadas e recuperação. |
+| Testes | 🟡 | 238 testes passam (`cargo test`), com casos normais, casos-limite e entradas danificadas. Incluem uma simulação com semente fixa de uma sessão de apalpação com as falhas do nó apalpador, com falhas injetadas e recuperação. |
 | Segurança | 🟡 | Rust seguro e simples (`forbid(unsafe_code)`): nada entra em pânico com os ficheiros recebidos e um valor mau é um erro com o seu motivo; sem revisão independente. |
 | Janela | 🟠 | Escrita (egui, `--features gui`): abrir ou largar um programa e um mapa de alturas, simular uma mesa, ver a mesa como malha colorida e as trajetórias niveladas, zoom e deslocamento, ajustar o nivelamento, exportar; a sua lógica está testada, mas ainda não foi compilada nem vista num ecrã. |
 | Hardware real | 🔴 | Não experimentado: nada disto foi executado numa máquina. |
@@ -122,6 +122,8 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 Um pequeno ficheiro de definições (`chave = valor`, uma por linha, `#` começa um comentário) guarda o que vale a pena ajustar; hoje tem cinco chaves: `decimals`, com quantas casas decimais se escrevem X, Y e Z no programa nivelado (3 por omissão, de 1 a 6), e `max-lines`, o máximo de linhas do programa nivelado (5000000 por omissão, de 1 a 100000000). `eh3d-autolevel config` imprime o ficheiro com cada valor por omissão (`examples/autolevel.cfg` é esse ficheiro), `--config FICHEIRO` lê um e `--decimals N` e `--max-lines N` dão as mesmas chaves na linha de comandos e prevalecem sobre o ficheiro. Um valor sem sentido é um erro que diz a sua linha. O resto é dado como argumentos da linha de comandos (ver Interfaces) e cada valor por omissão está escrito na ajuda do comando (`eh3d-autolevel help`). Os limites fixos são constantes com nome no código, cobertas por testes. `warn-shift-mm` é a correção de Z, em mm, acima da qual o `apply` mostra um aviso na saída de erros (0 por omissão: sem aviso; de 0,001 a 100); `--warn-shift MM` indica-a na linha de comandos e prevalece sobre o ficheiro, e o programa corrigido é escrito na mesma. `a-axis-compensation` (`off` ou `tilt`, `off` por omissão; `--a-compensation`) e `a-axis-radius-mm` (a distância em mm do eixo A ao corte, de -1000 a 1000 e diferente de 0 com `tilt`; `--a-radius`) somam a Z a correção que a rotação do eixo A traz (ver `docs/a-axis-compensation.md`); as opções prevalecem sobre o ficheiro. `spike-mm` é quanto, em mm, um ponto do mapa pode ler diferente do que dão os seus vizinhos antes de `apply` e `info` o mostrarem como leitura duvidosa (0,1 por predefinição, de 0 a 10; 0 não verifica); `--spike MM` indica-o na linha de comandos e prevalece sobre o ficheiro.
 
+**Modo servidor.** `apply --to-server` guarda no servidor EH3D, como artefacto, o programa corrigido, com o mapa, o método e os números da execução, `info --json --to-server` guarda o JSON do mapa e `demo-map --to-server` o mapa que acabou de escrever, para que os outros programas da suite (o ISOCAM também lê o mapa de alturas) os encontrem lá. A ligação é o cliente único da suite (`eh3d-serverclient` do EH3D-COMMON) e as suas chaves ficam no ficheiro de definições: `server_address` (`host:port`; vazio significa desligado), `server_token` (só de escrita, nunca é mostrado), `server_machine`, `server_timeout_s` (1 a 120, 15 por omissão), `server_retries` (0 a 5, 2 por omissão), `server_mdns` (`off` por omissão) e `server_max_answer_mib` (1 a 256, 8 por omissão). As recusas do servidor são explicadas pelo seu código no idioma do sistema. `eh3d-autolevel server status --config FILE` mostra as definições (o token como `***`) e o que o servidor responde. Não se envia nada sem endereço e o trabalho local nunca depende do servidor.
+
 ## 🚀 Início rápido
 
 Precisa de uma cadeia de ferramentas Rust estável (1.88 ou mais recente).
@@ -138,7 +140,7 @@ Para tirar uma captura da janela sem a abrir à mão, execute-o com `--shot FICH
 
 ## 🧪 Testes
 
-O conjunto tem 220 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
+O conjunto tem 238 testes (`cargo test`, executados em Windows e Linux no CI). Verificam os casos normais, os casos-limite e as entradas danificadas: ficheiros vazios, lixo e ficheiros cortados nunca provocam pânico. O CI executa ainda `cargo fmt --check`, `cargo clippy` com avisos como erros e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilação e publicação
 

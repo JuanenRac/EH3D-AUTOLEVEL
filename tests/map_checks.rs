@@ -461,3 +461,258 @@ fn a_clean_simulated_table_gives_no_doubtful_reading_with_the_default_limit() {
     assert!(!err.contains("warning: point"), "{err}");
     let _ = fs::remove_dir_all(&dir);
 }
+// ---- the server mode ----
+
+/// A server of the computer that answers `n` requests with `status` and `body` and gives back the requests it got.
+fn local_server(
+    n: usize,
+    status: &str,
+    body: &str,
+) -> (String, std::thread::JoinHandle<Vec<String>>) {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let reply = format!(
+        "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let handle = std::thread::spawn(move || {
+        let mut heads = Vec::new();
+        for _ in 0..n {
+            let Ok((mut s, _)) = listener.accept() else {
+                break;
+            };
+            let mut buf = vec![0u8; 262_144];
+            let mut got = 0;
+            loop {
+                let k = s.read(&mut buf[got..]).unwrap_or(0);
+                if k == 0 {
+                    break;
+                }
+                got += k;
+                let text = String::from_utf8_lossy(&buf[..got]).to_string();
+                if let Some(split) = text.find("\r\n\r\n") {
+                    let want = text[..split]
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .and_then(|v| v.trim().parse::<usize>().ok())
+                        })
+                        .unwrap_or(0);
+                    if got >= split + 4 + want {
+                        break;
+                    }
+                }
+            }
+            heads.push(String::from_utf8_lossy(&buf[..got]).to_string());
+            let _ = s.write_all(reply.as_bytes());
+        }
+        heads
+    });
+    (address, handle)
+}
+
+const CREATED: &str = "{\"artifact_id\":\"a-7\",\"blob_sha256\":\"ab\",\"size\":9}";
+
+fn link_file(dir: &std::path::Path, address: &str) -> String {
+    let cfg = path(dir, "link.cfg");
+    fs::write(
+        &cfg,
+        format!("server_address = {address}\nserver_token = program-token\nserver_retries = 0\nserver_timeout_s = 5\n"),
+    )
+    .unwrap();
+    cfg
+}
+
+fn map_and_program(dir: &std::path::Path) -> (String, String) {
+    let (map, prog) = (path(dir, "map.txt"), path(dir, "in.nc"));
+    let (code, _, e) = run(&["demo-map", &map, "0", "0", "100", "100", "3", "3"]);
+    assert_eq!(code, Some(0), "{e}");
+    fs::write(&prog, PROGRAM).unwrap();
+    (map, prog)
+}
+
+#[test]
+fn the_corrected_program_is_kept_on_the_server_with_the_map_and_the_figures_of_the_run() {
+    let dir = scratch("to_server");
+    let (map, prog) = map_and_program(&dir);
+    let out = path(&dir, "out.nc");
+    let (address, handle) = local_server(1, "201 Created", CREATED);
+    let cfg = link_file(&dir, &address);
+    let (code, o, e) = run(&["apply", &map, &prog, &out, "--config", &cfg, "--to-server"]);
+    assert_eq!(code, Some(0), "{e}");
+    assert!(o.contains("kept on the server: out.nc as a-7"), "{o}");
+    let heads = handle.join().unwrap();
+    assert!(
+        heads[0].starts_with("POST /api/v1/artifacts HTTP/1.1"),
+        "{}",
+        heads[0]
+    );
+    assert!(heads[0].contains("Bearer program-token"));
+    assert!(heads[0].contains("\"name\":\"out.nc\""), "{}", heads[0]);
+    assert!(
+        heads[0].contains("\"format\":\"text/x-gcode\""),
+        "{}",
+        heads[0]
+    );
+    assert!(heads[0].contains("\"command\":\"apply\""), "{}", heads[0]);
+    assert!(heads[0].contains("\"map\":\"map.txt\""), "{}", heads[0]);
+    assert!(heads[0].contains("\"method\":\"bilinear\""), "{}", heads[0]);
+    assert!(heads[0].contains("\"moves\":\""), "{}", heads[0]);
+    assert!(fs::read_to_string(&out).unwrap().contains("G1 X50"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn to_server_is_refused_before_any_work_and_the_local_mode_is_untouched() {
+    let dir = scratch("no_server");
+    let (map, prog) = map_and_program(&dir);
+    let out = path(&dir, "out.nc");
+    let (code, _, e) = run(&["apply", &map, &prog, &out, "--to-server"]);
+    assert_eq!(code, Some(1));
+    assert!(e.contains("--config"), "{e}");
+    assert!(!std::path::Path::new(&out).exists(), "nothing was written");
+    let cfg = path(&dir, "none.cfg");
+    fs::write(&cfg, "decimals = 3\n").unwrap();
+    let (code, _, e) = run(&["apply", &map, &prog, &out, "--config", &cfg, "--to-server"]);
+    assert_eq!(code, Some(1));
+    assert!(e.contains("server mode is off"), "{e}");
+    assert!(!std::path::Path::new(&out).exists());
+    // a dry run writes nothing, so it has nothing to keep
+    let cfg = link_file(&dir, "127.0.0.1:1");
+    let (code, _, e) = run(&[
+        "apply",
+        &map,
+        &prog,
+        "--dry-run",
+        "--config",
+        &cfg,
+        "--to-server",
+    ]);
+    assert_eq!(code, Some(1));
+    assert!(e.contains("--dry-run"), "{e}");
+    // info keeps only its JSON
+    let (code, _, e) = run(&["info", &map, "--config", &cfg, "--to-server"]);
+    assert_eq!(code, Some(1));
+    assert!(e.contains("--json"), "{e}");
+    // and without --to-server nothing changes
+    let (code, o, e) = run(&["apply", &map, &prog, &out]);
+    assert_eq!(code, Some(0), "{e}");
+    assert!(!o.contains("kept on the server") && std::path::Path::new(&out).exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_json_of_info_and_a_demo_map_can_be_kept_on_the_server() {
+    let dir = scratch("info_and_map");
+    let map = path(&dir, "table.txt");
+    let (address, handle) = local_server(2, "201 Created", CREATED);
+    let cfg = link_file(&dir, &address);
+    let (code, o, e) = run(&[
+        "demo-map",
+        &map,
+        "0",
+        "0",
+        "100",
+        "100",
+        "3",
+        "3",
+        "--config",
+        &cfg,
+        "--to-server",
+    ]);
+    assert_eq!(code, Some(0), "{e}");
+    assert!(o.contains("kept on the server: table.txt as a-7"), "{o}");
+    let (code, o, e) = run(&["info", &map, "--json", "--config", &cfg, "--to-server"]);
+    assert_eq!(code, Some(0), "{e}");
+    assert!(
+        o.contains("kept on the server: table.info.json as a-7"),
+        "{o}"
+    );
+    let heads = handle.join().unwrap();
+    assert!(
+        heads[0].contains("\"format\":\"text/plain\"") && heads[0].contains("\"cols\":\"3\""),
+        "{}",
+        heads[0]
+    );
+    assert!(
+        heads[1].contains("\"format\":\"application/json\"")
+            && heads[1].contains("\"command\":\"info\""),
+        "{}",
+        heads[1]
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_refusal_of_the_server_is_told_after_the_file_was_written() {
+    let dir = scratch("refused");
+    let (map, prog) = map_and_program(&dir);
+    let out = path(&dir, "out.nc");
+    let (address, handle) = local_server(
+        1,
+        "422 Unprocessable Entity",
+        "{\"error\":\"bad_artifact\",\"detail\":\"name too long\"}",
+    );
+    let cfg = link_file(&dir, &address);
+    let (code, _, e) = run(&["apply", &map, &prog, &out, "--config", &cfg, "--to-server"]);
+    handle.join().unwrap();
+    assert_eq!(code, Some(1));
+    assert!(
+        e.contains("not kept on the server") && e.contains("name too long"),
+        "{e}"
+    );
+    assert!(std::path::Path::new(&out).exists(), "the local file stays");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_server_command_shows_the_link_without_the_token_and_what_the_server_answers() {
+    let dir = scratch("status");
+    let (address, handle) = local_server(
+        1,
+        "200 OK",
+        "{\"name\":\"eh3d-server\",\"version\":\"0.1.8\",\"api_revision\":1,\"status\":\"ok\"}",
+    );
+    let cfg = link_file(&dir, &address);
+    let (code, o, e) = run(&["server", "status", "--config", &cfg]);
+    handle.join().unwrap();
+    assert_eq!(code, Some(0), "{e}");
+    assert!(
+        o.contains("server_token = ***") && !o.contains("program-token"),
+        "{o}"
+    );
+    assert!(o.contains("eh3d-server 0.1.8 (ok, api 1)"), "{o}");
+    let (code, o, _) = run(&["server"]);
+    assert_eq!(code, Some(0));
+    assert!(o.contains("server mode is off"), "{o}");
+    let (code, _, e) = run(&["server", "restart"]);
+    assert_eq!(code, Some(1));
+    assert!(e.contains("unknown"), "{e}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_keys_of_the_link_are_read_from_the_settings_file_with_their_ranges_and_given_once() {
+    let dir = scratch("keys");
+    let (map, prog) = map_and_program(&dir);
+    let out = path(&dir, "out.nc");
+    let cfg = path(&dir, "autolevel.cfg");
+    fs::write(&cfg, "server_address = 10.0.0.5:18200\nserver_token = abc\nserver_machine = bench\nserver_timeout_s = 120\nserver_retries = 5\nserver_mdns = off\nserver_max_answer_mib = 8\ndecimals = 4\n").unwrap();
+    let (code, _, e) = run(&["apply", &map, &prog, &out, "--config", &cfg]);
+    assert_eq!(code, Some(0), "{e}");
+    for (text, word) in [
+        ("server_timeout_s = 0\n", "server_timeout_s"),
+        ("server_retries = 6\n", "server_retries"),
+        ("server_mdns = maybe\n", "server_mdns"),
+        ("server_address = a b\n", "server_address"),
+        ("server_retries = 1\nserver_retries = 2\n", "twice"),
+    ] {
+        fs::write(&cfg, text).unwrap();
+        let (code, _, e) = run(&["apply", &map, &prog, &out, "--config", &cfg]);
+        assert_eq!(code, Some(1), "{text}");
+        assert!(e.contains(word) && e.contains("line"), "{text}: {e}");
+    }
+    let _ = fs::remove_dir_all(&dir);
+}

@@ -17,7 +17,7 @@
 
 ---
 
-**Ehrlichkeitscheck - was heute wirklich läuft:** eine Rust-Bibliothek und ein Kommandozeilenprogramm (`eh3d-autolevel`) mit 220 Tests, die auf einem Computer laufen: korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen. Es hat ein Fenster (Build mit `--features gui`), das ein G-Code-Programm und eine Höhenkarte öffnet, den Tisch als farbiges Netz mit den nivellierten Bahnen darüber zeigt und exportiert, aber das Fenster wurde noch nicht auf einem Bildschirm angesehen; wurde an keiner Maschine ausprobiert und nicht an einer Sammlung echter Dateien geprüft.
+**Ehrlichkeitscheck - was heute wirklich läuft:** eine Rust-Bibliothek und ein Kommandozeilenprogramm (`eh3d-autolevel`) mit 238 Tests, die auf einem Computer laufen: korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen. Es hat ein Fenster (Build mit `--features gui`), das ein G-Code-Programm und eine Höhenkarte öffnet, den Tisch als farbiges Netz mit den nivellierten Bahnen darüber zeigt und exportiert, aber das Fenster wurde noch nicht auf einem Bildschirm angesehen; wurde an keiner Maschine ausprobiert und nicht an einer Sammlung echter Dateien geprüft.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.0` |
 | Reifegrad | Funktionsfähig |
-| Tests | 220 |
+| Tests | 238 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nicht erprobt: nichts davon lief an einer Maschine |
 
@@ -46,7 +46,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 |---|---|---|
 | Kern | 🟡 | korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen; am Computer mit normalen und beschädigten Eingaben getestet, nicht mit einer Sammlung echter Dateien. |
 | Kommandozeile | 🟡 | `eh3d-autolevel` führt dieselben Funktionen wie die Bibliothek aus und gibt das Ergebnis aus; jeder Fehler kommt als Meldung mit einem Exit-Code ungleich null zurück. |
-| Tests | 🟡 | 220 Tests bestehen (`cargo test`), mit Normalfällen, Grenzfällen und beschädigten Eingaben. Dazu gehört eine Simulation mit festem Seed für eine Antastsitzung mit den Fehlern des Tastknotens, mit eingespeisten Fehlern und Wiederherstellung. |
+| Tests | 🟡 | 238 Tests bestehen (`cargo test`), mit Normalfällen, Grenzfällen und beschädigten Eingaben. Dazu gehört eine Simulation mit festem Seed für eine Antastsitzung mit den Fehlern des Tastknotens, mit eingespeisten Fehlern und Wiederherstellung. |
 | Sicherheit | 🟡 | Reines sicheres Rust (`forbid(unsafe_code)`): nichts gerät bei den übergebenen Dateien in Panik und ein schlechter Wert ist ein Fehler mit Begründung; keine unabhängige Prüfung. |
 | Fenster | 🟠 | Geschrieben (egui, `--features gui`): Programm und Höhenkarte öffnen oder hineinziehen, einen Tisch simulieren, den Tisch als farbiges Netz und die nivellierten Bahnen sehen, Zoom und Verschieben, die Nivellierung einstellen, exportieren; die Logik ist getestet, aber noch nicht gebaut oder auf einem Bildschirm angesehen. |
 | Echte Hardware | 🔴 | Nicht erprobt: nichts davon wurde an einer Maschine ausgeführt. |
@@ -122,6 +122,8 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 Eine kleine Einstellungsdatei (`Schlüssel = Wert`, eine pro Zeile, `#` beginnt einen Kommentar) enthält, was sich einzustellen lohnt; heute hat sie fünf Schlüssel: `decimals`, mit wie vielen Dezimalstellen X, Y und Z im nivellierten Programm geschrieben werden (Standard 3, von 1 bis 6), und `max-lines`, die höchste Zeilenzahl des nivellierten Programms (Standard 5000000, von 1 bis 100000000). `eh3d-autolevel config` gibt die Datei mit allen Standardwerten aus (`examples/autolevel.cfg` ist diese Datei), `--config DATEI` liest eine, und `--decimals N` und `--max-lines N` geben dieselben Schlüssel auf der Kommandozeile an und gehen der Datei vor. Ein sinnloser Wert ist ein Fehler, der seine Zeile nennt. Der Rest wird als Argumente der Kommandozeile angegeben (siehe Schnittstellen), und jeder Standardwert steht in der Hilfe des Befehls (`eh3d-autolevel help`). Die festen Grenzen stehen als benannte Konstanten im Code und sind durch Tests abgedeckt. `warn-shift-mm` ist die Korrektur von Z in mm, ab der `apply` eine Warnung auf der Fehlerausgabe zeigt (standardmäßig 0: keine Warnung; von 0,001 bis 100); `--warn-shift MM` gibt sie auf der Kommandozeile an und hat Vorrang vor der Datei, und das korrigierte Programm wird trotzdem geschrieben. `a-axis-compensation` (`off` oder `tilt`, standardmäßig `off`; `--a-compensation`) und `a-axis-radius-mm` (der Abstand der Achse A zum Schnitt in mm, von -1000 bis 1000 und bei `tilt` nicht 0; `--a-radius`) addieren zu Z die Korrektur, die die Drehung der Achse A mit sich bringt (siehe `docs/a-axis-compensation.md`); die Optionen haben Vorrang vor der Datei. `spike-mm` ist der Betrag in mm, um den ein Punkt der Karte von dem abweichen darf, was seine Nachbarn ergeben, bevor `apply` und `info` ihn als zweifelhaften Messwert zeigen (standardmäßig 0,1, von 0 bis 10; 0 gibt keine Prüfung); `--spike MM` gibt ihn in der Befehlszeile an und gewinnt gegenüber der Datei.
 
+**Servermodus.** `apply --to-server` legt das korrigierte Programm als Artefakt auf dem EH3D-Server ab, mit der Karte, dem Verfahren und den Zahlen des Laufs, `info --json --to-server` legt das JSON der Karte ab und `demo-map --to-server` die soeben geschriebene Karte, damit die anderen Programme der Suite (auch ISOCAM liest die Höhenkarte) sie dort finden. Die Verbindung ist der eine Client der Suite (`eh3d-serverclient` aus EH3D-COMMON); ihre Schlüssel stehen in der Einstellungsdatei: `server_address` (`host:port`; leer bedeutet aus), `server_token` (nur schreibbar, wird nie angezeigt), `server_machine`, `server_timeout_s` (1 bis 120, Standard 15), `server_retries` (0 bis 5, Standard 2), `server_mdns` (Standard `off`) und `server_max_answer_mib` (1 bis 256, Standard 8). Die Ablehnungen des Servers werden anhand ihres Codes in der Sprache des Systems erklärt. `eh3d-autolevel server status --config FILE` zeigt die Einstellungen (das Token als `***`) und die Antwort des Servers. Ohne Adresse wird nichts gesendet, und die lokale Arbeit hängt nie vom Server ab.
+
 ## 🚀 Schnellstart
 
 Sie brauchen eine stabile Rust-Toolchain (1.88 oder neuer).
@@ -138,7 +140,7 @@ Um ein Bild des Fensters aufzunehmen, ohne es von Hand zu öffnen, starten Sie e
 
 ## 🧪 Tests
 
-Die Suite hat 220 Tests (`cargo test`, in der CI unter Windows und Linux). Sie prüfen Normalfälle, Grenzfälle und beschädigte Eingaben: leere Dateien, Datenmüll und abgeschnittene Dateien lösen nie eine Panik aus. Die CI führt außerdem `cargo fmt --check`, `cargo clippy` mit Warnungen als Fehlern und `python -I tools/ci_validate.py` aus.
+Die Suite hat 238 Tests (`cargo test`, in der CI unter Windows und Linux). Sie prüfen Normalfälle, Grenzfälle und beschädigte Eingaben: leere Dateien, Datenmüll und abgeschnittene Dateien lösen nie eine Panik aus. Die CI führt außerdem `cargo fmt --check`, `cargo clippy` mit Warnungen als Fehlern und `python -I tools/ci_validate.py` aus.
 
 ## 🏗️ Build und Veröffentlichung
 

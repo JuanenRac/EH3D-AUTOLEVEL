@@ -17,7 +17,7 @@
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 220 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
+**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 238 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.1.0` |
 | Maturità | Funzionale |
-| Test | 220 |
+| Test | 238 |
 | Stack tecnologico | Rust |
 | Su hardware reale | Non provato: nulla di questo ha girato su una macchina |
 
@@ -46,7 +46,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 |---|---|---|
 | Nucleo | 🟡 | corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie; provato su un computer con input normali e danneggiati, non con una raccolta di file reali. |
 | Riga di comando | 🟡 | `eh3d-autolevel` esegue le stesse funzioni della libreria e stampa il risultato; ogni errore torna come messaggio e codice di uscita diverso da zero. |
-| Test | 🟡 | 220 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. Includono una simulazione a seme fisso di una sessione di tastatura con i guasti del nodo tastatore, con guasti iniettati e ripristino. |
+| Test | 🟡 | 238 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. Includono una simulazione a seme fisso di una sessione di tastatura con i guasti del nodo tastatore, con guasti iniettati e ripristino. |
 | Sicurezza | 🟡 | Rust sicuro e semplice (`forbid(unsafe_code)`): nulla va in panico con i file ricevuti e un valore errato è un errore con il suo motivo; nessuna revisione indipendente. |
 | Finestra | 🟠 | Scritta (egui, `--features gui`): aprire o trascinare un programma e una mappa delle altezze, simulare un piano, vedere il piano come maglia colorata e i percorsi livellati, zoom e spostamento, regolare il livellamento, esportare; la sua logica è testata, ma non è ancora stata compilata né vista su uno schermo. |
 | Hardware reale | 🔴 | Non provato: nulla di questo è stato eseguito su una macchina. |
@@ -122,6 +122,8 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 Un piccolo file di impostazioni (`chiave = valore`, uno per riga, `#` inizia un commento) contiene ciò che vale la pena regolare; oggi ha cinque chiavi: `decimals`, con quanti decimali si scrivono X, Y e Z nel programma livellato (3 per impostazione predefinita, da 1 a 6), e `max-lines`, il massimo di righe del programma livellato (5000000 per impostazione predefinita, da 1 a 100000000). `eh3d-autolevel config` stampa il file con ogni valore predefinito (`examples/autolevel.cfg` è quel file), `--config FILE` ne legge uno e `--decimals N` e `--max-lines N` danno le stesse chiavi sulla riga di comando e prevalgono sul file. Un valore senza senso è un errore che indica la sua riga. Il resto si passa come argomenti della riga di comando (vedi Interfacce) e ogni valore predefinito è scritto nella guida del comando (`eh3d-autolevel help`). I limiti fissi sono costanti con nome nel codice, coperte da test. `warn-shift-mm` è la correzione di Z, in mm, oltre la quale `apply` mostra un avviso sull'uscita degli errori (0 per impostazione predefinita: nessun avviso; da 0,001 a 100); `--warn-shift MM` la indica da riga di comando e prevale sul file, e il programma corretto viene scritto comunque. `a-axis-compensation` (`off` o `tilt`, `off` per impostazione predefinita; `--a-compensation`) e `a-axis-radius-mm` (la distanza in mm dall'asse A al taglio, da -1000 a 1000 e diversa da 0 con `tilt`; `--a-radius`) aggiungono a Z la correzione che porta la rotazione dell'asse A (vedi `docs/a-axis-compensation.md`); le opzioni prevalgono sul file. `spike-mm` è di quanto, in mm, un punto della mappa può leggere diversamente da ciò che danno i suoi vicini prima che `apply` e `info` lo mostrino come lettura dubbia (0,1 per impostazione predefinita, da 0 a 10; 0 non controlla); `--spike MM` lo dà sulla riga di comando e prevale sul file.
 
+**Modalità server.** `apply --to-server` conserva sul server EH3D, come artefatto, il programma corretto, con la mappa, il metodo e le cifre dell'esecuzione, `info --json --to-server` conserva il JSON della mappa e `demo-map --to-server` la mappa appena scritta, così gli altri programmi della suite (anche ISOCAM legge la mappa delle altezze) li trovano lì. Il collegamento è l'unico client della suite (`eh3d-serverclient` di EH3D-COMMON) e le sue chiavi stanno nel file delle impostazioni: `server_address` (`host:port`; vuoto significa spento), `server_token` (solo scrittura, mai mostrato), `server_machine`, `server_timeout_s` (da 1 a 120, 15 predefinito), `server_retries` (da 0 a 5, 2 predefinito), `server_mdns` (`off` predefinito) e `server_max_answer_mib` (da 1 a 256, 8 predefinito). I rifiuti del server vengono spiegati dal loro codice nella lingua del sistema. `eh3d-autolevel server status --config FILE` mostra le impostazioni (il token come `***`) e la risposta del server. Senza indirizzo non viene inviato nulla e il lavoro locale non dipende mai dal server.
+
 ## 🚀 Avvio rapido
 
 Serve una toolchain Rust stabile (1.88 o più recente).
@@ -138,7 +140,7 @@ Per fare un'immagine della finestra senza aprirla a mano, eseguila con `--shot F
 
 ## 🧪 Test
 
-La suite ha 220 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
+La suite ha 238 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilazione e rilascio
 
