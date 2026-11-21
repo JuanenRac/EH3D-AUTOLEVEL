@@ -4,6 +4,7 @@
 //! The height map itself (the grid, the probe readings and the bilinear surface) lives in `eh3d-levelling`, in EH3D-COMMON. This crate adds the bicubic surface and the
 //! program that rewrites a G-code file so that the tool follows the table.
 
+pub mod arcs;
 pub mod browse;
 pub mod config;
 pub mod gcode;
@@ -12,6 +13,8 @@ pub mod gui;
 pub mod lang;
 pub mod server;
 pub mod shot;
+pub mod start;
+pub mod stream;
 pub mod surface;
 pub mod viewport;
 pub mod window;

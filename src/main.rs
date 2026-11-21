@@ -11,6 +11,8 @@ use eh3d_autolevel::gcode::{
     shift_warning, Options,
 };
 use eh3d_autolevel::server;
+use eh3d_autolevel::start;
+use eh3d_autolevel::stream::{send_program, SimMachine, StreamLimits};
 use eh3d_autolevel::surface::{map_json, missing, rms_from_plane, spike_text, spikes, Method};
 use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
@@ -21,7 +23,8 @@ use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
 
-  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
+  eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--arcs refuse|cut] [--arc-tolerance MM] [--start X,Y,Z | --start-report FILE] [--config FILE] [--dry-run] [--json]
+  eh3d-autolevel stream MAP.txt IN.nc [--out FILE] [--segment 1.0] [--ref X,Y] [--bicubic] [--arcs refuse|cut] [--arc-tolerance MM] [--start X,Y,Z | --start-report FILE] [--config FILE] [--json]   levels the program line by line as an emitter would send it, to a simulated machine; exit code 2 when it stops
   eh3d-autolevel config                            every setting with its default, as a file
   eh3d-autolevel server [status] [--config FILE]   the link to the EH3D server (server_address, server_token, server_machine, server_timeout_s, server_retries, server_mdns and server_max_answer_mib of the settings file) and what the server answers
   eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
@@ -38,7 +41,10 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 --warn-shift MM (0 by default: no warning; otherwise 0.001 to 100) shows a warning on the error output when the correction of Z passes MM up or down; the program is written all the same. The key in the file is `warn-shift-mm`.
 --a-compensation tilt (off by default) adds r * (1 - cos A) to Z for the turn of the axis A, with r from --a-radius MM (-1000 to 1000, not 0); the keys of the file are `a-axis-compensation` and `a-axis-radius-mm`, and the options win over the file. The axis B (a turn about Y) has the same with --b-compensation tilt and --b-radius MM (`b-axis-compensation`, `b-axis-radius-mm`) and the two add up; the axis C turns about Z and needs none (its words are carried like A and B). A notice on the error output says when it was applied.
 A, B and C are interpolated like X and Y when a cutting move is cut in pieces.
-MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres and straight moves only; arcs, G91 and G20 are refused with their line.";
+--arcs cut (refuse by default; key `arcs`) cuts an arc (G2, G3 in the plane of X and Y, with I and J or with R) in straight pieces that follow the table; --arc-tolerance MM (key `arc-tolerance-mm`, 0.001 to 1, 0.01 by default) is the most a piece may stray from the arc, and a piece is never longer than --segment either.
+--start X,Y,Z says where the tool stands when the program starts (as the machine reports it, so with the correction of the table in Z); --start-report FILE reads it from a saved status report of GRBL or answer to M114 of Marlin. Without either the program is taken to start at 0 on every axis.
+stream sends the program through the emitter to a simulated machine, line by line, and stops with the exit code 2 (the spindle off and the tool lifted) when a line goes outside the measured area by more than `stream-outside-mm`, would go below `stream-min-z-mm`, gets a correction beyond `stream-max-shift-mm` or cannot be levelled; --out FILE keeps the lines that were sent. Nothing is sent to a real machine.
+MAP.txt is the file that the probe of the suite writes (first line: levelling 1). Absolute millimetres; straight moves, and arcs when --arcs cut is given; G91 and G20 are refused with their line.";
 
 /// The text of a file given on the command line, with the same size limit as the window.
 fn read_text(path: &str) -> Result<String, String> {
@@ -128,6 +134,100 @@ fn stem_of(path: &str) -> String {
         .to_string()
 }
 
+/// The options about arcs and about where the program starts, taken out of `args` (they win over the settings file).
+fn take_arc_and_start_options(args: &mut Vec<String>, opts: &mut Options) -> Result<(), String> {
+    if let Some(a) = flag(args, "--arcs")? {
+        opts.arcs = config::parse_arcs(&a).map_err(|e| format!("--arcs: {e}"))?;
+    }
+    if let Some(t) = flag(args, "--arc-tolerance")? {
+        opts.arc_tolerance_mm = eh3d_autolevel::arcs::parse_tolerance(&t)
+            .map_err(|e| format!("--arc-tolerance: {e}"))?;
+    }
+    let place = flag(args, "--start")?;
+    let report = flag(args, "--start-report")?;
+    opts.start = match (place, report) {
+        (Some(_), Some(_)) => {
+            return Err("--start and --start-report cannot be given together".into())
+        }
+        (Some(p), None) => Some(start::parse_place(&p).map_err(|e| format!("--start: {e}"))?),
+        (None, Some(path)) => Some(
+            start::from_report(&read_text(&path)?)
+                .map_err(|e| format!("--start-report {path}: {e}"))?,
+        ),
+        (None, None) => None,
+    };
+    Ok(())
+}
+
+/// `stream MAP.txt IN.nc`: the program goes through the emitter, line by line, to a simulated machine. `Ok(true)` when the stream stopped before the end of the program.
+fn stream_command(mut args: Vec<String>) -> Result<bool, String> {
+    let mut opts = Options::default();
+    let mut limits = StreamLimits::default();
+    if let Some(path) = flag(&mut args, "--config")? {
+        let settings = config::parse(&read_text(&path)?).map_err(|e| format!("{path}: {e}"))?;
+        settings.apply_to(&mut opts);
+        limits = settings.stream;
+    }
+    take_arc_and_start_options(&mut args, &mut opts)?;
+    if let Some(s) = flag(&mut args, "--segment")? {
+        opts.max_segment_mm = num(&s, "--segment")?;
+    }
+    if let Some(r) = flag(&mut args, "--ref")? {
+        let (x, y) = r.split_once(',').ok_or("--ref needs X,Y")?;
+        opts.reference = (num(x, "--ref X")?, num(y, "--ref Y")?);
+    }
+    if switch(&mut args, "--bicubic") {
+        opts.method = Method::Bicubic;
+    }
+    let out_path = flag(&mut args, "--out")?;
+    let json = switch(&mut args, "--json");
+    if args.len() < 2 {
+        return Err("stream needs a map and an input program".into());
+    }
+    finish(&args, 2)?;
+    let map = load_map(&args[0])?;
+    let text = read_text(&args[1])?;
+    let mut machine = SimMachine::new(&map, opts.reference, opts.method);
+    let outcome = send_program(&text, &map, &opts, limits, &mut machine)?;
+    if let Some(path) = &out_path {
+        let mut body: Vec<&str> = outcome.sent.iter().map(String::as_str).collect();
+        body.extend(outcome.safe.iter().map(String::as_str));
+        fs::write(path, format!("{}\n", body.join("\n"))).map_err(|e| format!("{path}: {e}"))?;
+    }
+    let halt_text = outcome.halt.as_ref().map(|h| h.to_string());
+    if json {
+        use eh3d_autolevel::surface::json_number as jn;
+        println!(
+            "{{\"stopped\":{},\"stop_line\":{},\"stop_reason\":{},\"sent\":{},\"safe_lines\":{},\"deepest_mm\":{},\"rapid_into_table\":{},\"moves\":{},\"pieces_added\":{},\"arcs_cut\":{}}}",
+            outcome.halt.is_some(),
+            outcome.halt.as_ref().map_or("null".to_string(), |h| h.line.to_string()),
+            outcome.halt.as_ref().map_or("null".to_string(), |h| format!("\"{}\"", h.reason.code())),
+            outcome.sent.len(),
+            outcome.safe.len(),
+            jn(machine.deepest_mm),
+            machine.rapid_into_table,
+            outcome.report.moves,
+            outcome.report.pieces_added,
+            outcome.report.arcs_cut
+        );
+    } else {
+        println!(
+            "{} lines sent, {} moves, {} pieces added, deepest cut {:+.4} mm from the surface of the table, {} rapid moves below it",
+            outcome.sent.len(),
+            outcome.report.moves,
+            outcome.report.pieces_added,
+            machine.deepest_mm,
+            machine.rapid_into_table
+        );
+    }
+    if let Some(text) = halt_text {
+        eprintln!("stopped: {text}");
+        eprintln!("then sent: {}", outcome.safe.join(" ; "));
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 fn run(mut args: Vec<String>) -> Result<(), String> {
     if args.is_empty() || matches!(args[0].as_str(), "help" | "--help" | "-h") {
         println!("{HELP}");
@@ -150,20 +250,15 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             if let Some(path) = &config_path {
                 let text = read_text(path)?;
                 let settings = config::parse(&text).map_err(|e| format!("{path}: {e}"))?;
-                opts.decimals = settings.decimals;
-                opts.max_output_lines = settings.max_lines;
+                settings.apply_to(&mut opts);
                 warn_shift = settings.warn_shift_mm;
-                opts.a_compensation = settings.a_axis_compensation;
-                opts.a_radius_mm = settings.a_axis_radius_mm;
-                opts.b_compensation = settings.b_axis_compensation;
-                opts.b_radius_mm = settings.b_axis_radius_mm;
-                opts.unknown_axis = settings.unknown_axis;
                 spike = settings.spike_mm;
             }
             if let Some(u) = flag(&mut args, "--unknown-axis")? {
                 opts.unknown_axis =
                     config::parse_unknown_axis(&u).map_err(|e| format!("--unknown-axis: {e}"))?;
             }
+            take_arc_and_start_options(&mut args, &mut opts)?;
             if let Some(c) = flag(&mut args, "--a-compensation")? {
                 opts.a_compensation = config::parse_a_compensation(&c)
                     .map_err(|e| format!("--a-compensation: {e}"))?;
@@ -247,10 +342,13 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             for s in &doubtful {
                 eprintln!("warning: {}", spike_text(s));
             }
-            let summary = format!(
+            let mut summary = format!(
                 "{} moves corrected, {} pieces added, Z shifted from {:+.4} to {:+.4} mm",
                 r.moves, r.pieces_added, r.shift_min, r.shift_max
             );
+            if r.arcs_cut > 0 {
+                summary.push_str(&format!(", {} arcs cut", r.arcs_cut));
+            }
             if dry_run {
                 // the program is corrected and counted, and nothing is written
                 if json {
@@ -588,6 +686,17 @@ fn main() -> ExitCode {
     #[cfg(feature = "gui")]
     if let Some(files) = window_request(&args) {
         return open_window(files);
+    }
+    if args.first().map(String::as_str) == Some("stream") {
+        return match stream_command(args[1..].to_vec()) {
+            Ok(false) => ExitCode::SUCCESS,
+            // the verification did not pass: the stream stopped
+            Ok(true) => ExitCode::from(2),
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::from(1)
+            }
+        };
     }
     match run(args) {
         Ok(()) => ExitCode::SUCCESS,

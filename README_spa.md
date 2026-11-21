@@ -17,7 +17,7 @@
 
 ---
 
-**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 247 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
+**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 267 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.1.1` |
 | Madurez | Funcional |
-| Pruebas | 247 |
+| Pruebas | 267 |
 | Pila tecnológica | Rust |
 | En hardware real | No probado: nada de esto se ha ejecutado en una máquina |
 
@@ -46,7 +46,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 |---|---|---|
 | Núcleo | 🟡 | corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie; probado en un ordenador con entradas normales y dañadas, no con una colección de ficheros reales. |
 | Línea de comandos | 🟡 | `eh3d-autolevel` ejecuta las mismas funciones que la biblioteca e imprime el resultado; cada error vuelve como mensaje y un código de salida distinto de cero. |
-| Pruebas | 🟡 | 247 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. Incluyen una simulación con semilla fija de una sesión de palpado con los fallos del nodo palpador, con fallos inyectados y recuperación. |
+| Pruebas | 🟡 | 267 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. Incluyen una simulación con semilla fija de una sesión de palpado con los fallos del nodo palpador, con fallos inyectados y recuperación. |
 | Seguridad | 🟡 | Rust seguro y simple (`forbid(unsafe_code)`): nada entra en pánico con los ficheros recibidos y un valor malo es un error con su motivo; sin revisión independiente. |
 | Ventana | 🟠 | Escrita (egui, `--features gui`): abrir o soltar un programa y un mapa de alturas, simular una mesa, ver la mesa como malla coloreada y las trayectorias niveladas, zoom y desplazamiento, ajustar la nivelación, exportar; su lógica está probada, pero todavía no se ha compilado ni visto en una pantalla. |
 | Hardware real | 🔴 | No probado: nada de esto se ha ejecutado en una máquina. |
@@ -56,7 +56,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 
 * **El programa** (`src/gcode.rs`): un movimiento de corte (G1) se parte en trozos no más largos que la longitud elegida y cada trozo recibe la Z que da el mapa para su final; un movimiento rápido (G0) solo se corrige si lleva Z. El cero de la corrección es un punto de referencia, donde se fijó la Z del trabajo.
 * **La superficie** (`src/surface.rs`): bilineal (la del mapa de EH3D-COMMON) o bicúbica (Catmull-Rom), que pasa por todos los puntos medidos y sigue mejor una mesa curva; fuera de la malla se usa la altura del borde más cercano. `correct` cuenta los puntos que quedan fuera del área medida y avisa, igual que cuando el punto de referencia está fuera de ella.
-* **Lo que se rechaza** con el número de línea: distancias relativas (G91), pulgadas (G20), arcos (G2, G3), un movimiento antes de cualquier G0 o G1, un número que no lo es, una coordenada más allá de un millón de milímetros, un movimiento que daría más de cien mil trozos y un mapa con puntos sin medir.
+* **Lo que se rechaza** con el número de línea: distancias relativas (G91), pulgadas (G20), arcos (G2, G3, salvo con `arcs = cut`), un movimiento antes de cualquier G0 o G1, un número que no lo es, una coordenada más allá de un millón de milímetros, un movimiento que daría más de cien mil trozos y un mapa con puntos sin medir.
 * **Línea de comandos estricta:** una opción mal escrita (`--powr`) o una palabra de más es un error que la nombra, no algo que se ignora; si no, el programa haría su salida con los valores por defecto.
 * **Nunca nivelado dos veces:** el programa corregido empieza con una línea de comentario (`(eh3d-autolevel VERSION map=HASH ref=X,Y método seg=N)`) que dice que ya se niveló y con qué mapa; un programa que la lleva se rechaza con su línea, porque corregirlo otra vez sumaría dos veces la corrección de la mesa.
 * **Se rechazan los códigos que mueven el origen:** G10, G28, G30, G38, G43, G53, G92 y cualquier otro código G que no sea un movimiento simple ni un ajuste que deje la posición como está detienen el programa con el número de línea (antes se convertían en movimientos a Z0); una espera (G4) y la línea `%` del principio y del final de un programa pasan sin cambios, y un mapa que no da una altura finita se rechaza en vez de escribir `Z NaN`.
@@ -95,6 +95,9 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 * **Los ejes B y C:** el eje B (un giro sobre Y) tiene la misma compensación con su propio radio (`b-axis-compensation = tilt` y `b-axis-radius-mm` en el fichero, `--b-compensation` y `--b-radius`) y las dos se suman; el eje C gira sobre Z, no cambia ninguna altura y no necesita ninguna (sus palabras se llevan e interpolan como las de A y B). Una máquina simulada recorre el programa nivelado y comprueba la profundidad bajo la mesa; nada se ha ejecutado en una máquina con ejes rotativos. **Un movimiento que omite un eje:** por defecto se toma que el programa empieza en 0 en cada eje; `unknown-axis = refuse` (`--unknown-axis refuse`) rechaza, con el número de la línea, un movimiento que omite X, Y o Z antes de que el programa lo haya fijado.
 * **El programa nivelado empieza con la cabecera estándar:** el generador y su versión, las unidades, el programa de origen con su SHA-256 y las herramientas, como líneas de comentario antes de la marca; las pruebas vuelven a leer el resultado con el lector de la suite y no encuentran ningún aviso, ningún movimiento rápido dentro del material ni ningún corte con el husillo parado.
 * **Lecturas dudosas, la rugosidad del mapa y los puntos sin medir:** `info` y `apply` muestran un punto del mapa que marca más de `--spike MM` (o `spike-mm` en el fichero de ajustes, de 0 a 10 mm, 0,1 por defecto, 0 para no comprobar) por encima o por debajo de lo que dan sus vecinos (una sonda que resbaló, una viruta bajo la punta), listando solo el punto que más se aparta y sin detener nunca `apply`; `info` imprime además el área y el espaciado de la rejilla, la rugosidad (la distancia cuadrática media al plano más próximo) y los números de los puntos que no se midieron. `--json` imprime el resultado de `info` o de `apply` como un único objeto JSON para otros programas, y `demo-map` admite `--noise MM`, `--seed N` y `--bad COL,FILA,MM` para hacer un mapa simulado con errores de lectura y un punto malo, de modo que la comprobación pueda probarse. Probado solo en un ordenador.
+* **Arcos partidos en trozos (apagado por defecto):** con `arcs = cut` en el fichero de configuración (o `--arcs cut`), un arco (G2, G3 en el plano de X e Y, con I y J, con R o como círculo completo) se parte en trozos rectos cuyos extremos están sobre la circunferencia; `arc-tolerance-mm` (de 0,001 a 1 mm, 0,01 por defecto; `--arc-tolerance`) es lo máximo que un trozo puede separarse del arco, un trozo nunca es más largo que el segmento, cada trozo recibe la Z que da el mapa en su extremo y la Z avanza en línea recta a lo largo del arco (una hélice). Un arco sin centro, con un radio demasiado pequeño o con un extremo que no está en la circunferencia se rechaza con el número de la línea. Probado solo en un ordenador.
+* **La corrección mientras se envía el programa:** `eh3d-autolevel stream MAP.txt IN.nc` pasa el programa por un emisor que lo nivela línea a línea, como lo haría un programa de envío, hacia una máquina simulada. Se detiene, con el husillo apagado y la herramienta levantada, y termina con el código 2 cuando una línea sale del área medida en más de `stream-outside-mm`, bajaría de `stream-min-z-mm`, recibe una corrección de Z superior a `stream-max-shift-mm` o no se puede nivelar; de esa línea no se envía nada. Los límites y `stream-safe-z-mm` son claves del fichero de configuración con valores por defecto prudentes. No se envía nada a una máquina real y el programa de envío de la suite todavía no lo llama.
+* **La posición inicial:** `--start X,Y,Z` o `--start-report FICHERO` (un informe de estado de GRBL guardado o la respuesta a `M114` de Marlin, leídos con los lectores del crate de controladores de la suite) dicen dónde está la herramienta al empezar el programa, en vez de suponer 0 en cada eje; la Z que informa una máquina ya incluye la corrección de la mesa, así que la Z propia del programa se calcula a partir de ella. Una máquina en movimiento o en alarma, o un informe sin el desplazamiento de trabajo, no da posición. Probado contra el GRBL simulado de la suite, no contra una máquina real.
 
 ## 🔒 Seguridad y protección
 
@@ -111,7 +114,8 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 La biblioteca es `eh3d_autolevel` (`use eh3d_autolevel::...`); la línea de comandos es `eh3d-autolevel`. Las órdenes son estas; cada una imprime su resultado por la salida estándar e informa de un error por la salida de errores con un código de salida distinto de cero. No hay acceso a la red.
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--arcs refuse|cut] [--arc-tolerance MM] [--start X,Y,Z | --start-report FILE] [--config FILE] [--dry-run] [--json]
+eh3d-autolevel stream MAP.txt IN.nc [--out FILE] [--arcs refuse|cut] [--start X,Y,Z | --start-report FILE] [--config FILE] [--json]   levels the program line by line as an emitter would send it, to a simulated machine; exit code 2 when it stops
 eh3d-autolevel config                            every setting with its default, as a file
 eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
 eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
@@ -120,7 +124,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ Configuración
 
-Un pequeño fichero de ajustes (`clave = valor`, uno por línea, `#` empieza un comentario) guarda lo que merece afinarse; hoy tiene cinco claves: `decimals`, cuántos decimales se escriben en X, Y y Z del programa nivelado (3 por defecto, de 1 a 6), y `max-lines`, el máximo de líneas que puede tener el programa nivelado (5000000 por defecto, de 1 a 100000000). `eh3d-autolevel config` imprime el fichero con cada valor por defecto (`examples/autolevel.cfg` es ese fichero), `--config FICHERO` lee uno y `--decimals N` y `--max-lines N` dan las mismas claves en la línea de comandos y ganan al fichero. Un valor sin sentido es un error que dice su línea. Lo demás se da como argumentos de la línea de comandos (véase Interfaces) y cada valor por defecto está escrito en la ayuda de la orden (`eh3d-autolevel help`). Los límites fijos están en el código como constantes con nombre y las pruebas los cubren. `warn-shift-mm` es la corrección de Z, en mm, a partir de la cual `apply` muestra un aviso por la salida de errores (0 por defecto: sin aviso; de 0,001 a 100); `--warn-shift MM` la da en la línea de órdenes y gana al fichero, y el programa corregido se escribe igualmente. `a-axis-compensation` (`off` o `tilt`, por defecto `off`; `--a-compensation`) y `a-axis-radius-mm` (la distancia en mm del eje A al corte, de -1000 a 1000 y distinta de 0 con `tilt`; `--a-radius`) suman a Z la corrección que trae el giro del eje A (véase `docs/a-axis-compensation.md`); las opciones ganan al fichero. `spike-mm` es cuánto, en mm, puede marcar un punto del mapa respecto de lo que dan sus vecinos antes de que `apply` e `info` lo muestren como lectura dudosa (0,1 por defecto, de 0 a 10; 0 no comprueba); `--spike MM` lo da en la línea de órdenes y gana al fichero.
+Un pequeño fichero de ajustes (`clave = valor`, uno por línea, `#` empieza un comentario) guarda lo que merece afinarse; hoy tiene cinco claves: `decimals`, cuántos decimales se escriben en X, Y y Z del programa nivelado (3 por defecto, de 1 a 6), y `max-lines`, el máximo de líneas que puede tener el programa nivelado (5000000 por defecto, de 1 a 100000000). `eh3d-autolevel config` imprime el fichero con cada valor por defecto (`examples/autolevel.cfg` es ese fichero), `--config FICHERO` lee uno y `--decimals N` y `--max-lines N` dan las mismas claves en la línea de comandos y ganan al fichero. Un valor sin sentido es un error que dice su línea. Lo demás se da como argumentos de la línea de comandos (véase Interfaces) y cada valor por defecto está escrito en la ayuda de la orden (`eh3d-autolevel help`). Los límites fijos están en el código como constantes con nombre y las pruebas los cubren. `warn-shift-mm` es la corrección de Z, en mm, a partir de la cual `apply` muestra un aviso por la salida de errores (0 por defecto: sin aviso; de 0,001 a 100); `--warn-shift MM` la da en la línea de órdenes y gana al fichero, y el programa corregido se escribe igualmente. `a-axis-compensation` (`off` o `tilt`, por defecto `off`; `--a-compensation`) y `a-axis-radius-mm` (la distancia en mm del eje A al corte, de -1000 a 1000 y distinta de 0 con `tilt`; `--a-radius`) suman a Z la corrección que trae el giro del eje A (véase `docs/a-axis-compensation.md`); las opciones ganan al fichero. `spike-mm` es cuánto, en mm, puede marcar un punto del mapa respecto de lo que dan sus vecinos antes de que `apply` e `info` lo muestren como lectura dudosa (0,1 por defecto, de 0 a 10; 0 no comprueba); `--spike MM` lo da en la línea de órdenes y gana al fichero. `arcs` (`refuse` o `cut`, `refuse` por defecto; `--arcs`) y `arc-tolerance-mm` (de 0,001 a 1, 0,01 por defecto; `--arc-tolerance`) dicen si un arco se parte en trozos y cuánto puede separarse un trozo de él; `stream-min-z-mm` (-10 por defecto), `stream-max-shift-mm` (2 por defecto, 0 sin límite), `stream-outside-mm` (0 por defecto) y `stream-safe-z-mm` (5 por defecto) son los límites del emisor de `stream`.
 
 **Modo servidor.** `apply --to-server` guarda en el servidor EH3D, como artefacto, el programa corregido, con el mapa, el método y las cifras de la ejecución, `info --json --to-server` guarda el JSON del mapa y `demo-map --to-server` guarda el mapa que acaba de escribir, para que los demás programas de la suite (ISOCAM también lee el mapa de alturas) los encuentren allí. El enlace es el cliente único de la suite (`eh3d-serverclient` de EH3D-COMMON) y sus claves van en el archivo de ajustes: `server_address` (`host:port`; vacío significa apagado), `server_token` (solo escritura, nunca se muestra), `server_machine`, `server_timeout_s` (1 a 120, 15 por defecto), `server_retries` (0 a 5, 2 por defecto), `server_mdns` (`off` por defecto) y `server_max_answer_mib` (1 a 256, 8 por defecto). Las negativas del servidor se explican por su código en el idioma del sistema. `eh3d-autolevel server status --config FILE` muestra los ajustes (el token como `***`) y lo que responde el servidor. No se envía nada sin dirección y el trabajo local nunca depende del servidor.
 
@@ -140,7 +144,7 @@ Para sacar una captura de la ventana sin abrirla a mano, ejecútelo con `--shot 
 
 ## 🧪 Pruebas
 
-El conjunto tiene 247 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
+El conjunto tiene 267 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilación y publicación
 
@@ -167,6 +171,9 @@ EH3D-AUTOLEVEL/
 │   ├── cli_args.rs                              los argumentos de la línea de comandos, el mismo fichero en cada utilidad pequeña
 │   ├── config.rs                                el fichero de ajustes: los decimales de las coordenadas y el límite de líneas del programa nivelado
 │   ├── gcode.rs                                 una parte de la lógica
+│   ├── arcs.rs                                  arcos (G2, G3) partidos en trozos rectos dentro de una tolerancia
+│   ├── stream.rs                                el emisor que nivela línea a línea, sus límites y una máquina simulada
+│   ├── start.rs                                 la posición inicial, leída de un controlador o de un informe guardado
 │   ├── surface.rs                               una parte de la lógica
 │   ├── browse.rs                                la lista de ficheros de la ventana que abre un fichero
 │   ├── gui.rs                                   la ventana (egui, con la característica gui): dibuja el estado y transmite lo que hace la persona
@@ -177,6 +184,9 @@ EH3D-AUTOLEVEL/
 ├── tests/
 │   ├── fuzz.rs                                  pruebas con semilla fija: ficheros dañados, cortes y números raros
 │   ├── a_axis.rs                                tests de la corrección de Z por el giro del eje A, de sus claves de ajustes y de sus opciones
+│   ├── arcs.rs                                  pruebas del corte de arcos, su tolerancia y sus ajustes
+│   ├── streaming.rs                             pruebas del emisor: la parada segura, los límites y la orden con el código 2
+│   ├── start_pos.rs                             pruebas de la posición inicial leída de una máquina simulada y de informes
 │   ├── rotary_axes.rs                           pruebas de los ejes B y C y de la máquina simulada que comprueba la profundidad bajo la mesa
 │   ├── autolevel.rs                             pruebas de la biblioteca y la línea de comandos
 │   ├── decimals.rs                              tests de los decimales de las coordenadas y del fichero de ajustes
@@ -219,11 +229,11 @@ EH3D-AUTOLEVEL/
 
 * La ventana todavía no se ha visto en una pantalla y no puede medir una mesa: el mapa se abre de un fichero o se simula.
 * No se ha probado en una máquina ni con una colección de ficheros reales y no ha tenido revisión independiente.
-* Los arcos se rechazan en vez de partirse en trozos, se supone que el programa empieza en X0 Y0 Z0 y el mapa viene de la sonda de la suite o de una mesa simulada, no de una medida real.
+* Los arcos se rechazan salvo que `arcs = cut` los parta en trozos, el programa se supone que empieza en X0 Y0 Z0 salvo que se dé la posición inicial, el emisor solo se prueba contra una máquina simulada y el mapa viene de la sonda de la suite o de una mesa simulada, no de una medida real.
 
 **Siguiente**
 
-* Partir los arcos en trozos, tomar la posición inicial de la máquina y corregir el programa mientras se envía, no antes.
+* Que el programa de envío de la suite llame al emisor, leer la posición inicial de una máquina real, arcos en los planos X–Z e Y–Z y arcos que se conserven como arcos.
 * Ver la ventana en una pantalla y terminarla.
 * Probarlo con ficheros reales y con los demás programas de la suite.
 

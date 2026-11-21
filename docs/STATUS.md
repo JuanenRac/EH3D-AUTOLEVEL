@@ -2,23 +2,23 @@
 
 ## Current state
 
-EH3D-AUTOLEVEL is a working program on a computer: a library (`eh3d_autolevel`), a command line (`eh3d-autolevel`) and a window (built with `--features gui`). It levels programs, describes maps and runs a simulated probing session against a simulated probe node. The suite of tests runs on Windows and Linux in the CI. The window has not been looked at on a screen, and nothing has moved a real machine or been compared with a collection of real files.
+EH3D-AUTOLEVEL is a working program on a computer: a library (`eh3d_autolevel`), a command line (`eh3d-autolevel`) and a window (built with `--features gui`). It levels programs (arcs too, when the setting says cut), describes maps, runs a simulated probing session against a simulated probe node, levels a program line by line through an emitter model into a simulated machine that stops in a safe state, and takes the start position from a report that a machine gives. The suite of tests runs on Windows and Linux in the CI. The window has not been looked at on a screen, and nothing has moved a real machine or been compared with a collection of real files.
 
 ## Capabilities
 
-The official state of each capability is in `REQUIREMENTS.md`. The register has 37 requirements: 28 implemented, 4 prototype, 5 planned and 0 validated. By progress: 28 done, 4 partial, 1 pending and 4 blocked. This page never states a state that `REQUIREMENTS.md` does not.
+The official state of each capability is in `REQUIREMENTS.md`. The register has 54 requirements: 46 implemented, 6 prototype, 2 planned and 0 validated. By progress: 46 done, 6 partial, 0 pending and 2 blocked. This page never states a state that `REQUIREMENTS.md` does not.
 
 ## Open questions
 
-* How arcs should be cut: into straight pieces that follow the table, or kept as arcs with a corrected plane.
-* Whether the start position of a program is read from the machine or given by the person; today it is taken to be 0 on every axis.
-* Whether the correction should be made while the program is sent instead of before.
+* Whether an arc should also be kept as an arc with a corrected plane, instead of being cut into straight pieces (today it is cut, when the setting says so).
+* How the sending program of the suite will call the emitter, and whether the correction made while sending replaces the correction of the file or sits beside it.
+* Whether the start position read from a machine should be asked again at the start of every job or kept from the last one.
 
 ## What it needs from other repositories
 
-* `EH3D-COMMON`: the height map and the client of the server, as a sibling folder at the version named in the workflows.
+* `EH3D-COMMON`: the height map, the client of the server and the readers and simulated machines of the controllers, as a sibling folder at the version named in the workflows.
 * `EH3D-CORE-LIBS`: the G-code reader.
-* The probe node and the program that sends a job to a machine, for anything that is not simulated.
+* The probe node and the program that sends a job to a machine, for anything that is not simulated; the emitter is not called by the sending program yet.
 
 ## Known technical debt and omitted tests
 

@@ -17,7 +17,7 @@
 
 ---
 
-**诚实检查 - 当前真正能运行的内容：** 一个 Rust 库和一个命令行程序（`eh3d-autolevel`），有 247 个在电脑上运行的测试：用工作台高度图修正 G 代码程序的 Z 值，并把移动切成沿表面的小段。有一个窗口（用 `--features gui` 构建），可以打开 G 代码程序和高度图，把工作台显示为彩色网格并在其上叠加校平后的路径，还能导出，但窗口尚未在屏幕上看过，没有在机器上试过，也没有用大量真实文件验证过。
+**诚实检查 - 当前真正能运行的内容：** 一个 Rust 库和一个命令行程序（`eh3d-autolevel`），有 267 个在电脑上运行的测试：用工作台高度图修正 G 代码程序的 Z 值，并把移动切成沿表面的小段。有一个窗口（用 `--features gui` 构建），可以打开 G 代码程序和高度图，把工作台显示为彩色网格并在其上叠加校平后的路径，还能导出，但窗口尚未在屏幕上看过，没有在机器上试过，也没有用大量真实文件验证过。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | 版本 | `0.1.1` |
 | 成熟度 | 可用 |
-| 测试 | 247 |
+| 测试 | 267 |
 | 技术栈 | Rust |
 | 真实硬件 | 未试过：这里的任何内容都没有在机器上运行过 |
 
@@ -46,7 +46,7 @@
 |---|---|---|
 | 核心 | 🟡 | 用工作台高度图修正 G 代码程序的 Z 值，并把移动切成沿表面的小段；已在电脑上用正常和损坏的输入测试，未用大量真实文件验证。 |
 | 命令行 | 🟡 | `eh3d-autolevel` 运行与库相同的函数并打印结果；每个错误都以消息和非零退出码返回。 |
-| 测试 | 🟡 | 247 个测试通过（`cargo test`），包含正常情况、边界情况和损坏的输入。其中包括对含探测节点故障的探测会话的固定种子模拟，含注入故障与恢复。 |
+| 测试 | 🟡 | 267 个测试通过（`cargo test`），包含正常情况、边界情况和损坏的输入。其中包括对含探测节点故障的探测会话的固定种子模拟，含注入故障与恢复。 |
 | 安全 | 🟡 | 纯安全 Rust（`forbid(unsafe_code)`）：处理收到的文件时不会 panic，错误的值会返回带原因的错误；没有独立审查。 |
 | 窗口 | 🟠 | 已编写（egui，`--features gui`）：打开或拖入程序和高度图、模拟工作台、以彩色网格查看工作台和校平后的路径、缩放和平移、设置校平参数、导出；其逻辑已测试，但尚未构建，也尚未在屏幕上看过。 |
 | 真实硬件 | 🔴 | 未试过：这里的任何内容都没有在机器上运行过。 |
@@ -56,7 +56,7 @@
 
 * **程序**（`src/gcode.rs`）：切削移动（G1）被切成不超过所选长度的小段，每段的终点由高度图给出 Z；快速移动（G0）只有带 Z 时才修正。修正的零点是一个参考点，即设定作业 Z 的位置。
 * **表面**（`src/surface.rs`）：双线性（EH3D-COMMON 中高度图自带的）或双三次（Catmull-Rom），后者经过每个测量点，更贴合弯曲的工作台；网格之外使用最近边缘的高度。 `correct` 会统计落在测量区域之外的点并给出警告；参考点在区域之外时同样如此。
-* **会被拒绝的内容**（带行号）：相对坐标（G91）、英寸（G20）、圆弧（G2、G3）、出现在任何 G0 或 G1 之前的移动、不是数字的数字、超过一百万毫米的坐标、会产生十万段以上的移动，以及含有未测量点的高度图。
+* **会被拒绝的内容**（带行号）：相对坐标（G91）、英寸（G20）、圆弧（G2、G3；使用 `arcs = cut` 时除外）、出现在任何 G0 或 G1 之前的移动、不是数字的数字、超过一百万毫米的坐标、会产生十万段以上的移动，以及含有未测量点的高度图。
 * **严格的命令行：** 写错的选项（`--powr`）或多余的词会产生指明它的错误，而不是被忽略；否则程序会用默认值生成输出。
 * **绝不调平两次：** 修正后的程序以一行注释（`(eh3d-autolevel VERSION map=HASH ref=X,Y 方法 seg=N)`）开头，说明它已被调平以及用的是哪张地图；带有这一行的程序会连同行号被拒绝，因为再次修正会把工作台的修正加两遍。
 * **会移动原点的代码会被拒绝：** G10、G28、G30、G38、G43、G53、G92 以及任何既不是普通移动、也不是不改变位置的设置的 G 代码，都会连同行号一起中止程序（以前它们会被变成移动到 Z0）；暂停（G4）以及程序开头和结尾的 `%` 行原样通过，而没有有限高度的地图会被拒绝，不会写出 `Z NaN`。
@@ -95,6 +95,9 @@ EH3D-AUTOLEVEL 是 EH3D Fabrication Suite 的一个程序。它以库和命令�
 * **B 轴和 C 轴：** B 轴（绕 Y 轴旋转）有与 A 轴相同的补偿，并有自己的半径（文件中为 `b-axis-compensation = tilt` 和 `b-axis-radius-mm`，命令行为 `--b-compensation` 和 `--b-radius`），两者相加；C 轴绕 Z 轴旋转，不改变高度，因此不需要补偿（其字与 A、B 一样被保留并插值）。模拟机床会遍历校平后的程序并检查工作台下的深度；尚未在带旋转轴的机床上运行过。 **省略了某个轴的移动：** 默认认为程序在每个轴上都从 0 开始；`unknown-axis = refuse`（`--unknown-axis refuse`）会在程序尚未设置 X、Y 或 Z 时，拒绝省略该轴的移动，并给出行号。
 * **校平后的程序以标准文件头开头:** 生成程序及其版本、单位、来源程序及其 SHA-256 和刀具,作为标记之前的注释行;测试用套件的读取器重新读取结果,找不到任何警告、进入材料的快速移动或主轴停转时的切削。
 * **可疑读数、地图的粗糙度和未测量的点：** `info` 和 `apply` 会显示地图中读数比其相邻点所给出的值高出或低出超过 `--spike MM`（或设置文件中的 `spike-mm`，0 至 10 mm，默认 0.1，0 表示不检查）的点（探针打滑、针尖下有碎屑），只列出偏离最大的点，并且绝不会中止 `apply`；`info` 还会输出网格的范围和间距、粗糙度（到最接近平面的距离的均方根）以及未测量点的编号。`--json` 将 `info` 或 `apply` 的结果作为单个 JSON 对象输出，供其他程序使用；`demo-map` 接受 `--noise MM`、`--seed N` 和 `--bad 列,行,MM`，用于生成带有读数误差和一个坏点的模拟地图，以便试验该检查。仅在计算机上测试过。
+* **把圆弧切成小段（默认关闭）：** 在设置文件中写 `arcs = cut`（或使用 `--arcs cut`），圆弧（X 与 Y 平面内的 G2、G3，可用 I 和 J、R 或整圆）会被切成端点都在圆上的直线小段；`arc-tolerance-mm`（0.001 到 1 mm，默认 0.01，`--arc-tolerance`）是小段偏离圆弧的最大距离，小段也不会比分段长度更长，每一小段的 Z 取高度图在其端点给出的值，Z 沿圆弧按直线变化（螺旋线）。没有圆心、半径太小或终点不在圆上的圆弧会连同行号一起被拒绝。仅在计算机上试验过。
+* **发送过程中的修正：** `eh3d-autolevel stream MAP.txt IN.nc` 让程序经过一个逐行调平的发射器，就像发送程序那样，送入模拟机器。当某一行超出测量区域超过 `stream-outside-mm`、会低于 `stream-min-z-mm`、Z 修正超过 `stream-max-shift-mm` 或无法调平时，它会停止，主轴关闭、刀具抬起，并以退出码 2 结束；该行的任何内容都不会被发送。这些上限和 `stream-safe-z-mm` 是设置文件中的键，默认值偏保守。不会向真实机器发送任何内容，套件的发送程序也尚未调用它。
+* **起始位置：** `--start X,Y,Z` 或 `--start-report FILE`（保存的 GRBL 状态报告，或 Marlin 对 `M114` 的回答，使用套件控制器库的读取器读取）说明程序开始时刀具所在的位置，而不是假定每个轴都为 0；机器报告的 Z 已经包含工作台的修正，因此程序自身的 Z 由它推算。正在运动或处于报警状态的机器，或没有工作偏移的报告，不会给出位置。已对套件的模拟 GRBL 试验，未对真实机器试验。
 
 ## 🔒 安全与防护
 
@@ -111,7 +114,8 @@ EH3D-AUTOLEVEL 是 EH3D Fabrication Suite 的一个程序。它以库和命令�
 库为 `eh3d_autolevel`（`use eh3d_autolevel::...`），命令行为 `eh3d-autolevel`。命令如下；每个命令把结果打印到标准输出，把错误以非零退出码报告到标准错误。没有网络访问。
 
 ```text
-eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--config FILE] [--dry-run] [--json]
+eh3d-autolevel apply MAP.txt IN.nc OUT.nc [--segment 1.0] [--ref X,Y] [--bicubic] [--max-lines 5000000] [--decimals 3] [--warn-shift MM] [--a-compensation off|tilt] [--a-radius MM] [--spike MM] [--arcs refuse|cut] [--arc-tolerance MM] [--start X,Y,Z | --start-report FILE] [--config FILE] [--dry-run] [--json]
+eh3d-autolevel stream MAP.txt IN.nc [--out FILE] [--arcs refuse|cut] [--start X,Y,Z | --start-report FILE] [--config FILE] [--json]   levels the program line by line as an emitter would send it, to a simulated machine; exit code 2 when it stops
 eh3d-autolevel config                            every setting with its default, as a file
 eh3d-autolevel info MAP.txt [--spike MM] [--json]   how many points, the area, the spread, the tilt and the roughness of the table, the points not measured and the doubtful readings
 eh3d-autolevel demo-map OUT.txt X0 Y0 X1 Y1 COLS ROWS [--noise MM] [--seed N] [--bad COL,ROW,MM]    a map of a simulated tilted table with a bump
@@ -120,7 +124,7 @@ eh3d-autolevel [gui] [FILE...]                   the window (a build with --feat
 
 ## ⚙️ 配置
 
-一个小的设置文件（`键 = 值`，每行一个，`#` 开始注释）保存值得调整的内容；目前有五个键：`decimals`，校平后程序中 X、Y、Z 写成几位小数（默认 3，范围 1 到 6）；`max-lines`，校平后程序最多有多少行（默认 5000000，范围 1 到 100000000）。`eh3d-autolevel config` 会打印带有所有默认值的文件（`examples/autolevel.cfg` 就是该文件），`--config FILE` 读取文件，`--decimals N` 和 `--max-lines N` 在命令行给出同样的键并优先于文件。无意义的值会报错并指出其行号。其余内容通过命令行参数给出（见接口），每个默认值都写在命令的帮助中（`eh3d-autolevel help`）。固定的限制是代码中的具名常量，并有测试覆盖。 `warn-shift-mm` 是 Z 修正量（毫米）的上限，超过时 `apply` 会在错误输出上显示警告（默认 0：不警告；范围 0.001 到 100）；命令行的 `--warn-shift MM` 优先于文件，修正后的程序照常写出。`a-axis-compensation`（`off` 或 `tilt`，默认 `off`，选项 `--a-compensation`）和 `a-axis-radius-mm`（A 轴到切削点的距离，单位毫米，范围 -1000 到 1000，`tilt` 时不能为 0，选项 `--a-radius`）会把 A 轴转动带来的修正量加到 Z 上（见 `docs/a-axis-compensation.md`）；选项优先于文件。 `spike-mm` 是地图中某个点的读数与其相邻点所给出的值相差多少（mm，默认 0.1，范围 0 至 10；0 表示不检查）时，`apply` 和 `info` 才会把它显示为可疑读数；命令行中用 `--spike MM` 指定，优先于文件。
+一个小的设置文件（`键 = 值`，每行一个，`#` 开始注释）保存值得调整的内容；目前有五个键：`decimals`，校平后程序中 X、Y、Z 写成几位小数（默认 3，范围 1 到 6）；`max-lines`，校平后程序最多有多少行（默认 5000000，范围 1 到 100000000）。`eh3d-autolevel config` 会打印带有所有默认值的文件（`examples/autolevel.cfg` 就是该文件），`--config FILE` 读取文件，`--decimals N` 和 `--max-lines N` 在命令行给出同样的键并优先于文件。无意义的值会报错并指出其行号。其余内容通过命令行参数给出（见接口），每个默认值都写在命令的帮助中（`eh3d-autolevel help`）。固定的限制是代码中的具名常量，并有测试覆盖。 `warn-shift-mm` 是 Z 修正量（毫米）的上限，超过时 `apply` 会在错误输出上显示警告（默认 0：不警告；范围 0.001 到 100）；命令行的 `--warn-shift MM` 优先于文件，修正后的程序照常写出。`a-axis-compensation`（`off` 或 `tilt`，默认 `off`，选项 `--a-compensation`）和 `a-axis-radius-mm`（A 轴到切削点的距离，单位毫米，范围 -1000 到 1000，`tilt` 时不能为 0，选项 `--a-radius`）会把 A 轴转动带来的修正量加到 Z 上（见 `docs/a-axis-compensation.md`）；选项优先于文件。 `spike-mm` 是地图中某个点的读数与其相邻点所给出的值相差多少（mm，默认 0.1，范围 0 至 10；0 表示不检查）时，`apply` 和 `info` 才会把它显示为可疑读数；命令行中用 `--spike MM` 指定，优先于文件。 `arcs`（`refuse` 或 `cut`，默认 `refuse`，`--arcs`）和 `arc-tolerance-mm`（0.001 到 1，默认 0.01，`--arc-tolerance`）决定圆弧是否被切成小段，以及小段可偏离圆弧多远；`stream-min-z-mm`（默认 -10）、`stream-max-shift-mm`（默认 2，0 表示不限）、`stream-outside-mm`（默认 0）和 `stream-safe-z-mm`（默认 5）是 `stream` 发射器的上限。
 
 **服务器模式。** `apply --to-server` 会把修正后的程序连同地图、方法和运行数据作为工件保存到 EH3D 服务器，`info --json --to-server` 保存地图的 JSON，`demo-map --to-server` 保存刚写出的地图，供套件中的其他程序（ISOCAM 也会读取高度图）在那里找到。 连接使用套件统一的客户端（EH3D-COMMON 的 `eh3d-serverclient`），其键写在设置文件中：`server_address`（`host:port`，为空表示关闭）、`server_token`（只写，从不显示）、`server_machine`、`server_timeout_s`（1 到 120，默认 15）、`server_retries`（0 到 5，默认 2）、`server_mdns`（默认 `off`）和 `server_max_answer_mib`（1 到 256，默认 8）。服务器的拒绝会按其代码以系统语言说明。`eh3d-autolevel server status --config FILE` 显示设置（令牌显示为 `***`）和服务器的回答。没有地址就不会发送任何内容，本地工作也从不依赖服务器。
 
@@ -140,7 +144,7 @@ cargo run --release --features gui -- --shot screen.png examples/sample.nc   # a
 
 ## 🧪 测试
 
-测试套件有 247 个测试（`cargo test`，CI 在 Windows 和 Linux 上运行）。它们检查正常情况、边界情况和损坏的输入：空文件、乱码和被截断的文件绝不会 panic。CI 还运行 `cargo fmt --check`、把警告当作错误的 `cargo clippy` 以及 `python -I tools/ci_validate.py`。
+测试套件有 267 个测试（`cargo test`，CI 在 Windows 和 Linux 上运行）。它们检查正常情况、边界情况和损坏的输入：空文件、乱码和被截断的文件绝不会 panic。CI 还运行 `cargo fmt --check`、把警告当作错误的 `cargo clippy` 以及 `python -I tools/ci_validate.py`。
 
 ## 🏗️ 构建与发布
 
@@ -167,6 +171,9 @@ EH3D-AUTOLEVEL/
 │   ├── cli_args.rs                              命令行参数：每个小工具中的同一个文件
 │   ├── config.rs                                设置文件：校平后程序坐标的小数位数和行数上限
 │   ├── gcode.rs                                 逻辑的一部分
+│   ├── arcs.rs                                  把圆弧（G2、G3）在容差内切成直线小段
+│   ├── stream.rs                                逐行调平的发射器、其上限和一台模拟机器
+│   ├── start.rs                                 从控制器或已保存的报告读取的起始位置
 │   ├── surface.rs                               逻辑的一部分
 │   ├── browse.rs                                打开文件窗口的文件列表
 │   ├── gui.rs                                   窗口（egui，gui 特性）：绘制状态并传递用户的操作
@@ -177,6 +184,9 @@ EH3D-AUTOLEVEL/
 ├── tests/
 │   ├── fuzz.rs                                  固定种子的测试：损坏的文件、截断和异常数字
 │   ├── a_axis.rs                                A 轴转动的 Z 补偿及其设置键和选项的测试
+│   ├── arcs.rs                                  圆弧切分、容差及其设置的测试
+│   ├── streaming.rs                             发射器测试：安全停止、上限以及退出码 2 的命令
+│   ├── start_pos.rs                             从模拟机器和报告读取起始位置的测试
 │   ├── rotary_axes.rs                           B 轴和 C 轴以及检查工作台下深度的模拟机床的测试
 │   ├── autolevel.rs                             库和命令行的测试
 │   ├── decimals.rs                              坐标小数位数和设置文件的测试
@@ -219,11 +229,11 @@ EH3D-AUTOLEVEL/
 
 * 窗口尚未在屏幕上看过，也不能测量工作台：高度图从文件打开或模拟。
 * 没有在机器上试过，也没有用大量真实文件验证过，也没有独立审查。
-* 圆弧会被拒绝而不是切成小段，程序被假定从 X0 Y0 Z0 开始，高度图来自套件的探针或模拟工作台，而不是真实测量。
+* 除非 `arcs = cut` 把圆弧切成小段，否则圆弧会被拒绝；除非给出起始位置，否则程序被假定从 X0 Y0 Z0 开始；发射器只对模拟机器试验过；高度图来自套件的探针或模拟工作台，而不是真实测量。
 
 **下一步**
 
-* 把圆弧切成小段，从机器取得起始位置，并在发送过程中而不是事先修正程序。
+* 让套件的发送程序调用发射器、从真实机器读取起始位置、X–Z 与 Y–Z 平面内的圆弧，以及把圆弧保留为圆弧。
 * 在屏幕上查看窗口并完善它。
 * 用真实文件和套件的其他程序进行试用。
 

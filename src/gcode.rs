@@ -1,8 +1,10 @@
 //! Rewrites a G-code program so that the tool keeps the same depth into the board wherever the table is high or low: every cutting move (G1) is cut in pieces no longer than
 //! `max_segment_mm` and each piece gets the Z that the map gives for its end; a rapid move (G0) only has the Z corrected at its end when it has a Z word.
 //!
-//! What is supported: absolute millimetres (G90, G21) and straight moves (G0, G1). What is refused, with the number of the line: relative distances (G91), inches (G20), arcs (G2, G3)
-//! and a move before any G0 or G1. The program is assumed to start at X0 Y0 Z0 A0 B0 C0. Outside the grid the height of the nearest edge is used.
+//! What is supported: absolute millimetres (G90, G21) and straight moves (G0, G1), and arcs (G2, G3 in the plane of X and Y, see [`crate::arcs`]) when [`Options::arcs`] is
+//! [`ArcMode::Cut`]. What is refused, with the number of the line: relative distances (G91), inches (G20), arcs while they are not cut and a move before any G0 or G1. The program is
+//! assumed to start at X0 Y0 Z0 A0 B0 C0, or at [`Options::start`]. Outside the grid the height of the nearest edge is used. [`Leveller`] does the work one line at a time (the streaming
+//! emitter uses it) and [`correct`] feeds it a whole program.
 //!
 //! The rotary axes A, B and C are modal like the others: when a cutting move is cut in pieces their words are interpolated in a straight line between the value they had and the value
 //! the move gives, as X and Y are, and written with the same decimals; the height of the table comes from X and Y only. A program with no A, B or C is written as it always was.
@@ -12,6 +14,7 @@
 //! has the same compensation with its own radius ([`Options::b_compensation`], [`Options::b_radius_mm`]) and the two add up. The axis C turns about Z, so it never changes the height of the
 //! cut: its words are interpolated and written like the others and nothing is added to Z for them.
 
+use crate::arcs::{Arc, DEFAULT_ARC_TOLERANCE_MM, MAX_ARC_TOLERANCE_MM, MIN_ARC_TOLERANCE_MM};
 use crate::surface::{height, Method};
 use eh3d_levelling::HeightMap;
 use eh3d_parser_gcode::emit::{header, sha256_hex, Header};
@@ -56,6 +59,26 @@ impl UnknownAxis {
     }
 }
 
+/// What to do with an arc (G2, G3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ArcMode {
+    /// The program is refused with the number of the line (the way it always was).
+    #[default]
+    Refuse,
+    /// The arc is cut in straight pieces that follow the table (see [`crate::arcs`]).
+    Cut,
+}
+
+impl ArcMode {
+    /// The word of the settings file and of the command line.
+    pub fn name(self) -> &'static str {
+        match self {
+            ArcMode::Refuse => "refuse",
+            ArcMode::Cut => "cut",
+        }
+    }
+}
+
 /// The largest distance from the axis A to the cut that may be given, in mm (up or down; the sign turns the correction round).
 pub const MAX_A_RADIUS_MM: f64 = 1000.0;
 
@@ -86,6 +109,12 @@ pub struct Options {
     pub b_radius_mm: f64,
     /// What a move does that leaves out X, Y or Z before the program has set it (`assume-zero` by default).
     pub unknown_axis: UnknownAxis,
+    /// What an arc does: refused (by default) or cut in straight pieces.
+    pub arcs: ArcMode,
+    /// The most an arc may stray from its straight pieces, in mm (from 0.001 to 1).
+    pub arc_tolerance_mm: f64,
+    /// Where the tool stands when the program starts (X, Y and Z, as the machine reports them, so with the correction of the table in Z); `None` is the way it always was: at 0 on every axis.
+    pub start: Option<[f64; 3]>,
 }
 
 impl Default for Options {
@@ -101,6 +130,9 @@ impl Default for Options {
             b_compensation: AAxisCompensation::Off,
             b_radius_mm: 0.0,
             unknown_axis: UnknownAxis::AssumeZero,
+            arcs: ArcMode::Refuse,
+            arc_tolerance_mm: DEFAULT_ARC_TOLERANCE_MM,
+            start: None,
         }
     }
 }
@@ -121,6 +153,8 @@ pub struct Report {
     /// The same for the axis B.
     pub b_corrected: usize,
     pub b_shift_max: f64,
+    /// How many arcs were cut in pieces.
+    pub arcs_cut: usize,
     /// How many corrected points lie outside the measured area (their height is the one of the nearest edge, which was not measured there).
     pub outside_points: usize,
     /// The largest distance, in mm, from a corrected point to the measured area.
@@ -345,88 +379,191 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
     if let Some(n) = levelled_line(text) {
         return Err(format!("line {n}: this program was already levelled by eh3d-autolevel; level the original program, not its output"));
     }
-    map.require_complete().map_err(|e| e.to_string())?;
-    if !(MIN_DECIMALS..=MAX_DECIMALS).contains(&opts.decimals) {
-        return Err(format!(
-            "decimals is {}: it must be a whole number from {MIN_DECIMALS} to {MAX_DECIMALS}",
-            opts.decimals
-        ));
+    let mut leveller = Leveller::new(map, opts)?;
+    let mut out = String::new();
+    for (i, raw) in text.lines().enumerate() {
+        leveller.feed(i + 1, raw, &mut out)?;
     }
-    let d = opts.decimals;
-    if opts.a_compensation == AAxisCompensation::Tilt
-        && !(opts.a_radius_mm.is_finite()
-            && opts.a_radius_mm != 0.0
-            && opts.a_radius_mm.abs() <= MAX_A_RADIUS_MM)
-    {
-        return Err(format!(
-            "a-axis-radius-mm is {}: with a-axis-compensation = tilt it must be a number other than 0, from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}",
-            opts.a_radius_mm
-        ));
-    }
-    if opts.b_compensation == AAxisCompensation::Tilt
-        && !(opts.b_radius_mm.is_finite()
-            && opts.b_radius_mm != 0.0
-            && opts.b_radius_mm.abs() <= MAX_A_RADIUS_MM)
-    {
-        return Err(format!(
-            "b-axis-radius-mm is {}: with b-axis-compensation = tilt it must be a number other than 0, from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}",
-            opts.b_radius_mm
-        ));
-    }
-    let tilt = opts.a_compensation == AAxisCompensation::Tilt;
-    let tilt_b = opts.b_compensation == AAxisCompensation::Tilt;
-    if !(opts.max_segment_mm.is_finite() && opts.max_segment_mm > 0.0) {
-        return Err(format!(
-            "max_segment_mm is {}: it must be more than 0",
-            opts.max_segment_mm
-        ));
-    }
-    // the points that lie outside the measured area (line 0 is the reference point)
-    let outside = std::cell::Cell::new((0_usize, 0.0_f64, 0.0_f64));
-    let at = |x: f64, y: f64, line: usize| {
-        let away = distance_outside(&map.grid, x, y);
-        let (count, worst, reference) = outside.get();
-        if line == 0 {
-            outside.set((count, worst, away));
-        } else if away > 0.0 {
-            outside.set((count + 1, worst.max(away), reference));
+    Ok((out, leveller.finish()))
+}
+
+/// Levels a program one line at a time: the same work as [`correct`], with what it follows from line to line (the modal move, where the tool stands, which axes were set, where the
+/// rotary axes stand) kept between the lines. [`correct`] feeds it a whole program; the streaming emitter feeds it the lines as they are sent.
+pub struct Leveller<'a> {
+    map: &'a HeightMap,
+    opts: &'a Options,
+    /// The height of the map at the reference point.
+    zero: f64,
+    /// The modal move: 0 and 1 are the straight moves, 2 and 3 the arcs.
+    mode: Option<u32>,
+    pos: (f64, f64, f64),
+    /// Which of X, Y and Z the program has set so far.
+    known: [bool; 3],
+    /// Where A, B and C stand (the program is assumed to start at 0).
+    rot: [f64; 3],
+    /// Whether the centre of an arc is given as a place (G90.1) and not as an offset (G91.1, the default).
+    arc_absolute: bool,
+    report: Report,
+    /// The points that lie outside the measured area: how many, the largest distance and the distance of the reference point.
+    outside: (usize, f64, f64),
+    /// The correction of Z of the last piece written.
+    last_shift: f64,
+}
+
+impl<'a> Leveller<'a> {
+    /// A leveller for `map` and `opts`; the options and the map are checked here, so a program is never half levelled for a wrong setting. The tool is taken to be at X0 Y0 Z0, or at
+    /// [`Options::start`] when it is given.
+    pub fn new(map: &'a HeightMap, opts: &'a Options) -> Result<Leveller<'a>, String> {
+        map.require_complete().map_err(|e| e.to_string())?;
+        if !(MIN_DECIMALS..=MAX_DECIMALS).contains(&opts.decimals) {
+            return Err(format!(
+                "decimals is {}: it must be a whole number from {MIN_DECIMALS} to {MAX_DECIMALS}",
+                opts.decimals
+            ));
         }
-        height(map, x, y, opts.method)
+        if opts.a_compensation == AAxisCompensation::Tilt
+            && !(opts.a_radius_mm.is_finite()
+                && opts.a_radius_mm != 0.0
+                && opts.a_radius_mm.abs() <= MAX_A_RADIUS_MM)
+        {
+            return Err(format!(
+                "a-axis-radius-mm is {}: with a-axis-compensation = tilt it must be a number other than 0, from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}",
+                opts.a_radius_mm
+            ));
+        }
+        if opts.b_compensation == AAxisCompensation::Tilt
+            && !(opts.b_radius_mm.is_finite()
+                && opts.b_radius_mm != 0.0
+                && opts.b_radius_mm.abs() <= MAX_A_RADIUS_MM)
+        {
+            return Err(format!(
+                "b-axis-radius-mm is {}: with b-axis-compensation = tilt it must be a number other than 0, from -{MAX_A_RADIUS_MM} to {MAX_A_RADIUS_MM}",
+                opts.b_radius_mm
+            ));
+        }
+        if !(opts.max_segment_mm.is_finite() && opts.max_segment_mm > 0.0) {
+            return Err(format!(
+                "max_segment_mm is {}: it must be more than 0",
+                opts.max_segment_mm
+            ));
+        }
+        if !(opts.arc_tolerance_mm.is_finite()
+            && (MIN_ARC_TOLERANCE_MM..=MAX_ARC_TOLERANCE_MM).contains(&opts.arc_tolerance_mm))
+        {
+            return Err(format!(
+                "arc-tolerance-mm is {}: it must be a number from {MIN_ARC_TOLERANCE_MM} to {MAX_ARC_TOLERANCE_MM}",
+                opts.arc_tolerance_mm
+            ));
+        }
+        let mut me = Leveller {
+            map,
+            opts,
+            zero: 0.0,
+            mode: None,
+            pos: (0.0, 0.0, 0.0),
+            known: [false; 3],
+            rot: [0.0; 3],
+            arc_absolute: false,
+            report: Report {
+                shift_min: f64::INFINITY,
+                shift_max: f64::NEG_INFINITY,
+                ..Report::default()
+            },
+            outside: (0, 0.0, 0.0),
+            last_shift: 0.0,
+        };
+        me.zero = me.at(opts.reference.0, opts.reference.1, 0)?;
+        if let Some(start) = opts.start {
+            if !start
+                .iter()
+                .all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE)
+            {
+                return Err(format!(
+                    "the start position {start:?} is not valid: each axis must be a number within {MAX_COORDINATE} mm"
+                ));
+            }
+            // the place is where the tool stands, which already carries the correction of the table: the program's own Z is what is left without it
+            let shift = height(map, start[0], start[1], opts.method)
+                .filter(|h| h.is_finite())
+                .ok_or_else(|| {
+                    format!(
+                        "the map has no height at the start position ({:.3}, {:.3})",
+                        start[0], start[1]
+                    )
+                })?
+                - me.zero;
+            me.pos = (start[0], start[1], start[2] - shift);
+            me.known = [true; 3];
+        }
+        Ok(me)
+    }
+
+    /// The height of the map at `(x, y)`; the points outside the measured area are counted (line 0 is the reference point).
+    fn at(&mut self, x: f64, y: f64, line: usize) -> Result<f64, String> {
+        let away = distance_outside(&self.map.grid, x, y);
+        let (count, worst, reference) = self.outside;
+        if line == 0 {
+            self.outside = (count, worst, away);
+        } else if away > 0.0 {
+            self.outside = (count + 1, worst.max(away), reference);
+        }
+        height(self.map, x, y, self.opts.method)
             .filter(|h| h.is_finite())
             .ok_or_else(|| format!("line {line}: the map has no height at ({x:.3}, {y:.3})"))
-    };
-    let zero = at(opts.reference.0, opts.reference.1, 0)?;
-    let mut out = String::new();
-    let mut report = Report {
-        shift_min: f64::INFINITY,
-        shift_max: f64::NEG_INFINITY,
-        ..Report::default()
-    };
-    let mut mode: Option<u32> = None;
-    let mut pos = (0.0, 0.0, 0.0);
-    // which of X, Y and Z the program has set so far
-    let mut known = [false; 3];
-    // where A, B and C stand (the program is assumed to start at 0), followed from line to line
-    let mut rot = [0.0_f64; 3];
-    for (i, raw) in text.lines().enumerate() {
-        let n = i + 1;
+    }
+
+    /// Where the tool stands after the lines fed so far, in the terms of the program (without the correction).
+    pub fn position(&self) -> (f64, f64, f64) {
+        self.pos
+    }
+
+    /// The correction of Z of the last piece written (0 before any).
+    pub fn last_shift(&self) -> f64 {
+        self.last_shift
+    }
+
+    /// What was counted so far.
+    pub fn report(&self) -> Report {
+        let mut report = self.report;
+        if report.moves == 0 {
+            report.shift_min = 0.0;
+            report.shift_max = 0.0;
+        }
+        report.outside_points = self.outside.0;
+        report.outside_max_mm = self.outside.1;
+        report.reference_outside_mm = self.outside.2;
+        report
+    }
+
+    /// The report of the whole program.
+    pub fn finish(self) -> Report {
+        self.report()
+    }
+
+    /// Levels the line number `n` (from 1) and appends what it becomes to `out`, each line ending in a line feed. On an error nothing is appended for this line.
+    pub fn feed(&mut self, n: usize, raw: &str, out: &mut String) -> Result<(), String> {
+        let opts = self.opts;
+        let d = opts.decimals;
+        let tilt = opts.a_compensation == AAxisCompensation::Tilt;
+        let tilt_b = opts.b_compensation == AAxisCompensation::Tilt;
         // the '%' that some postprocessors put at the start and at the end of the program is not a word
         if raw.trim() == "%" {
             out.push_str(raw);
             out.push('\n');
-            continue;
+            return Ok(());
         }
         // lines that are not moves and have no words to read: a system command of GRBL (`$H`), a parameter assignment (`#1=5`) and the text of a message (`M117 Hello`)
         if is_not_a_move(raw) {
             out.push_str(raw);
             out.push('\n');
-            continue;
+            return Ok(());
         }
         let w = words(raw, n)?;
         let mut moves_here = false;
         let mut dwell = false;
         // the modal G words that share the line with a move (G90, G54...) go in front of the rewritten move
         let mut kept: Vec<String> = Vec::new();
+        let mut mode = self.mode;
         for &(letter, value) in &w {
             match (letter, value) {
                 ('G', v)
@@ -441,7 +578,15 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                         || v == 94.0
                         || (54.0..=59.0).contains(&v)
                         || v == 90.1
-                        || v == 91.1 => kept.push(format!("G{}", fmt(v))),
+                        || v == 91.1 =>
+                {
+                    if v == 90.1 {
+                        self.arc_absolute = true;
+                    } else if v == 91.1 {
+                        self.arc_absolute = false;
+                    }
+                    kept.push(format!("G{}", fmt(v)));
+                }
                 // a dwell takes its time in P (or X on some controllers): the line is not a move
                 ('G', 4.0) => dwell = true,
                 ('G', 91.0) => {
@@ -450,17 +595,17 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     ))
                 }
                 ('G', 20.0) => return Err(format!("line {n}: inches (G20) are not supported")),
-                ('G', 2.0 | 3.0) => {
+                ('G', 2.0 | 3.0) if opts.arcs != ArcMode::Cut => {
                     return Err(format!(
-                    "line {n}: arcs (G2, G3) are not supported: they cannot be cut in pieces here"
+                    "line {n}: arcs (G2, G3) are not supported: they cannot be cut in pieces here (arcs = cut in the settings file cuts them)"
                 ))
                 }
-                ('G', v) if v == 0.0 || v == 1.0 => mode = Some(v as u32),
+                ('G', v) if v == 0.0 || v == 1.0 || v == 2.0 || v == 3.0 => mode = Some(v as u32),
                 // every other code changes the origin, the offsets or the way the machine moves (G10, G28, G30, G38, G43, G53, G92...):
                 // turning it into a plain move would be wrong, and dropping it would change the program
                 ('G', v) => {
                     return Err(format!(
-                        "line {n}: G{} is not supported (only G0, G1, G4, G17, G21, G40, G49, G54-G59, G61, G64, G80, G90, G90.1, G91.1 and G94 are)",
+                        "line {n}: G{} is not supported (only G0, G1, G2 and G3 with arcs = cut, G4, G17, G21, G40, G49, G54-G59, G61, G64, G80, G90, G90.1, G91.1 and G94 are)",
                         fmt(v)
                     ))
                 }
@@ -471,20 +616,29 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         if dwell {
             moves_here = false;
         }
+        // a full circle has no X or Y: its centre or radius is what says it is a move
+        if !dwell
+            && matches!(mode, Some(2 | 3))
+            && w.iter().any(|(l, _)| matches!(l, 'I' | 'J' | 'R'))
+        {
+            moves_here = true;
+        }
         if !moves_here {
             // a line with only rotary words (`G1 A30`) moves the rotary axes: the next cut starts where they stand
             if !dwell {
                 for (k, &c) in ROTARY.iter().enumerate() {
                     if let Some((_, v)) = w.iter().rev().find(|(l, _)| *l == c) {
-                        rot[k] = *v;
+                        self.rot[k] = *v;
                     }
                 }
             }
+            self.mode = mode;
             out.push_str(raw);
             out.push('\n');
-            continue;
+            return Ok(());
         }
         let m = mode.ok_or_else(|| format!("line {n}: a move before any G0 or G1"))?;
+        let pos = self.pos;
         let get = |c: char, default: f64| {
             w.iter()
                 .rev()
@@ -494,16 +648,11 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         };
         if opts.unknown_axis == UnknownAxis::Refuse {
             for (k, c) in ['X', 'Y', 'Z'].into_iter().enumerate() {
-                if !known[k] && !w.iter().any(|(l, _)| *l == c) {
+                if !self.known[k] && !w.iter().any(|(l, _)| *l == c) {
                     return Err(format!(
                         "line {n}: the move leaves out {c} and the program has not set it yet, so its place is not known (unknown-axis = refuse)"
                     ));
                 }
-            }
-        }
-        for (k, c) in ['X', 'Y', 'Z'].into_iter().enumerate() {
-            if w.iter().any(|(l, _)| *l == c) {
-                known[k] = true;
             }
         }
         let target = (get('X', pos.0), get('Y', pos.1), get('Z', pos.2));
@@ -514,12 +663,41 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 ));
             }
         }
+        // the arc this line draws (the centre and the turn), when it is one
+        let arc: Option<Arc> = if m >= 2 {
+            let find = |c: char| w.iter().rev().find(|(l, _)| *l == c).map(|(_, v)| *v);
+            if find('P').is_some() {
+                return Err(format!(
+                    "line {n}: the word P of an arc (several turns) is not supported"
+                ));
+            }
+            Some(
+                Arc::from_words(
+                    (pos.0, pos.1),
+                    (target.0, target.1),
+                    (find('I'), find('J')),
+                    find('R'),
+                    m == 3,
+                    self.arc_absolute,
+                )
+                .map_err(|e| format!("line {n}: {e}"))?,
+            )
+        } else {
+            None
+        };
+        // the line is accepted from here on: what it sets is remembered
+        for (k, c) in ['X', 'Y', 'Z'].into_iter().enumerate() {
+            if w.iter().any(|(l, _)| *l == c) {
+                self.known[k] = true;
+            }
+        }
         // the controller does the spindle and coolant words (M3 to M9) of a block BEFORE its motion, and the words that end or pause the program (M0, M1, M2, M30, ...) after it:
         // in a cut move the first go with the first piece and the second with the last piece
         let (m_words, others): (Vec<(char, f64)>, Vec<String>) = {
             let rest: Vec<(char, f64)> = w
                 .iter()
                 .filter(|(l, _)| !matches!(l, 'G' | 'X' | 'Y' | 'Z'))
+                .filter(|(l, _)| arc.is_none() || !matches!(l, 'I' | 'J' | 'K' | 'R' | 'P'))
                 .copied()
                 .collect();
             let text = |&(l, v): &(char, f64)| format!("{l}{}", fmt(v));
@@ -542,6 +720,7 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
         };
         let has_z = w.iter().any(|(l, _)| *l == 'Z');
         // the rotary axes this line moves: (letter, where it stands, where it goes)
+        let rot = self.rot;
         let rotary: Vec<(char, f64, f64)> = ROTARY
             .iter()
             .enumerate()
@@ -561,22 +740,6 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             .iter()
             .find(|(c, _, _)| *c == 'B')
             .map(|&(_, f, t)| (f, t));
-        let mut track = |shift: f64, a_shift: f64, b_shift: f64| {
-            report.shift_min = report.shift_min.min(shift);
-            report.shift_max = report.shift_max.max(shift);
-            if a_shift != 0.0 {
-                report.a_corrected += 1;
-                if a_shift.abs() > report.a_shift_max.abs() {
-                    report.a_shift_max = a_shift;
-                }
-            }
-            if b_shift != 0.0 {
-                report.b_corrected += 1;
-                if b_shift.abs() > report.b_shift_max.abs() {
-                    report.b_shift_max = b_shift;
-                }
-            }
-        };
         let b_shift_of = |b: f64| {
             if tilt_b {
                 a_axis_shift(opts.b_radius_mm, b)
@@ -600,10 +763,10 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             if has_z {
                 let a_shift = a_shift_of(a_from.map_or(rot[0], |(_, to)| to));
                 let b_shift = b_shift_of(b_from.map_or(rot[1], |(_, to)| to));
-                let shift = at(target.0, target.1, n)? - zero + a_shift + b_shift;
-                track(shift, a_shift, b_shift);
+                let shift = self.at(target.0, target.1, n)? - self.zero + a_shift + b_shift;
+                self.track(shift, a_shift, b_shift);
                 line.push(format!("Z{}", coord(target.2 + shift, d)));
-                report.moves += 1;
+                self.report.moves += 1;
             }
             line.extend(others);
             line.extend(m_first);
@@ -611,18 +774,24 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             out.push_str(&line.join(" "));
             out.push('\n');
         } else {
-            let length = (target.0 - pos.0).hypot(target.1 - pos.1);
-            let pieces = ((length / opts.max_segment_mm).ceil().max(1.0)) as usize;
+            let pieces = match &arc {
+                Some(a) => a.pieces(opts.arc_tolerance_mm, opts.max_segment_mm),
+                None => {
+                    let length = (target.0 - pos.0).hypot(target.1 - pos.1);
+                    ((length / opts.max_segment_mm).ceil().max(1.0)) as usize
+                }
+            };
             if pieces > MAX_PIECES {
                 return Err(format!("line {n}: the move would be cut in {pieces} pieces (more than {MAX_PIECES}); use a longer piece"));
             }
-            if i + report.pieces_added + pieces > opts.max_output_lines {
+            if n - 1 + self.report.pieces_added + pieces > opts.max_output_lines {
                 return Err(format!("line {n}: the corrected program would have more than {} lines; use a longer piece (--segment) or raise the limit (--max-lines)", opts.max_output_lines));
             }
             // a move that is cut in pieces writes the rotary words itself; a move in one piece keeps its words as they are
             let others: Vec<String> = if pieces > 1 && !rotary.is_empty() {
                 w.iter()
                     .filter(|(l, _)| !matches!(l, 'G' | 'X' | 'Y' | 'Z' | 'M' | 'A' | 'B' | 'C'))
+                    .filter(|(l, _)| arc.is_none() || !matches!(l, 'I' | 'J' | 'K' | 'R' | 'P'))
                     .map(|&(l, v)| format!("{l}{}", fmt(v)))
                     .collect()
             } else {
@@ -630,11 +799,16 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
             };
             for k in 1..=pieces {
                 let t = k as f64 / pieces as f64;
-                let (x, y, z) = (
-                    pos.0 + (target.0 - pos.0) * t,
-                    pos.1 + (target.1 - pos.1) * t,
-                    pos.2 + (target.2 - pos.2) * t,
-                );
+                let (x, y) = match &arc {
+                    // the last piece ends exactly where the arc says
+                    Some(a) if k < pieces => a.point(t),
+                    Some(_) => (target.0, target.1),
+                    None => (
+                        pos.0 + (target.0 - pos.0) * t,
+                        pos.1 + (target.1 - pos.1) * t,
+                    ),
+                };
+                let z = pos.2 + (target.2 - pos.2) * t;
                 // the piece ends with A where the move puts it (interpolated when it is cut in pieces)
                 let a_here = match a_from {
                     Some((_, to)) if k == pieces => to,
@@ -648,8 +822,8 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                     None => rot[1],
                 };
                 let b_shift = b_shift_of(b_here);
-                let shift = at(x, y, n)? - zero + a_shift + b_shift;
-                track(shift, a_shift, b_shift);
+                let shift = self.at(x, y, n)? - self.zero + a_shift + b_shift;
+                self.track(shift, a_shift, b_shift);
                 let mut line = format!(
                     "G1 X{} Y{} Z{}",
                     coord(x, d),
@@ -685,25 +859,41 @@ pub fn correct(text: &str, map: &HeightMap, opts: &Options) -> Result<(String, R
                 out.push_str(&line);
                 out.push('\n');
             }
-            report.moves += 1;
-            report.pieces_added += pieces - 1;
-        }
-        pos = target;
-        for &(c, _, to) in &rotary {
-            if let Some(k) = ROTARY.iter().position(|&r| r == c) {
-                rot[k] = to;
+            self.report.moves += 1;
+            self.report.pieces_added += pieces - 1;
+            if arc.is_some() {
+                self.report.arcs_cut += 1;
             }
         }
+        self.pos = target;
+        self.mode = mode;
+        for &(c, _, to) in &rotary {
+            if let Some(k) = ROTARY.iter().position(|&r| r == c) {
+                self.rot[k] = to;
+            }
+        }
+        Ok(())
     }
-    if report.moves == 0 {
-        report.shift_min = 0.0;
-        report.shift_max = 0.0;
+
+    /// Writes down the correction of one piece in the report.
+    fn track(&mut self, shift: f64, a_shift: f64, b_shift: f64) {
+        let report = &mut self.report;
+        report.shift_min = report.shift_min.min(shift);
+        report.shift_max = report.shift_max.max(shift);
+        if a_shift != 0.0 {
+            report.a_corrected += 1;
+            if a_shift.abs() > report.a_shift_max.abs() {
+                report.a_shift_max = a_shift;
+            }
+        }
+        if b_shift != 0.0 {
+            report.b_corrected += 1;
+            if b_shift.abs() > report.b_shift_max.abs() {
+                report.b_shift_max = b_shift;
+            }
+        }
+        self.last_shift = shift;
     }
-    let (count, worst, reference) = outside.get();
-    report.outside_points = count;
-    report.outside_max_mm = worst;
-    report.reference_outside_mm = reference;
-    Ok((out, report))
 }
 
 /// What `apply --json` prints: one JSON object with what the correction did (the fields of [`Report`]), whether it was a dry run and how many points of the map read

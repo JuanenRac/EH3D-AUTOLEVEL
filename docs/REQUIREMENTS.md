@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine.
 
-The register has 37 requirements: 28 implemented, 4 prototype, 5 planned and 0 validated. By progress: 28 done, 4 partial, 1 pending and 4 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 54 requirements: 46 implemented, 6 prototype, 2 planned and 0 validated. By progress: 46 done, 6 partial, 0 pending and 2 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -67,12 +67,39 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | ALVL-031 | The window never writes the program over the map or the map over the program. | implemented | done | host-test | `src/window::the_program_is_never_written_over_the_map` | - |
 | ALVL-032 | Every sentence of the window has a text in each of the eight languages. | implemented | done | host-test | `src/lang::every_sentence_has_a_text_in_each_of_the_eight_languages` | - |
 
+## Arcs, streaming and the start position
+
+| ID | Requirement | State | Progress | Evidence | Test | Limits |
+|---|---|---|---|---|---|---|
+| ALVL-033 | Arcs are cut into pieces that follow the table. | implemented | done | host-test | `arcs::an_arc_is_cut_into_pieces_that_follow_the_table` | Off by default (`arcs = refuse`); no arc has been cut on a machine. |
+| ALVL-034 | The program is levelled while it is sent to the machine. | prototype | partial | simulator | `streaming::the_program_is_levelled_while_it_is_sent` | An emitter model and a simulated machine; the sending program of the suite does not call it yet. |
+| ALVL-035 | The start position of the program is the position the machine reports. | prototype | partial | simulator | `start_pos::the_start_of_the_program_is_the_position_the_machine_reports` | Read from the simulated GRBL of the suite and from saved reports; no real machine has reported its position. |
+
 ## Not written yet
 
 | ID | Requirement | State | Progress | Evidence | Test | Limits |
 |---|---|---|---|---|---|---|
-| ALVL-033 | Arcs are cut into pieces that follow the table. | planned | pending | none | `planned:arcs::an_arc_is_cut_into_pieces_that_follow_the_table` | Arcs are refused with their line today. |
-| ALVL-034 | The program is levelled while it is sent to the machine. | planned | blocked | none | `planned:streaming::the_program_is_levelled_while_it_is_sent` | Needs the sending program of the suite. |
-| ALVL-035 | The start position of the program is read from the machine. | planned | blocked | none | `planned:start_position::the_start_of_the_program_is_the_position_the_machine_reports` | Needs a machine that reports its position. |
 | ALVL-036 | A map from a real probe on a real table is read and a real program is levelled and cut. | planned | blocked | none | `planned:real_table::a_real_table_is_probed_and_a_real_program_is_levelled` | Needs a machine, a probe and a table. |
 | ALVL-037 | The window is looked at on a screen and matches the picture the program takes of itself. | planned | blocked | none | `planned:window_screen::the_window_matches_the_reference_picture` | Needs a person at a screen. |
+
+## Checks of arcs, of the stream and of the start position
+
+| ID | Requirement | State | Progress | Evidence | Test | Limits |
+|---|---|---|---|---|---|---|
+| ALVL-038 | The stream stops, with the spindle off, the tool lifted and nothing more sent, when a move goes outside the measured area by more than its margin, and the margin is a setting. | implemented | done | simulator | `streaming::a_move_outside_the_map_stops_the_stream_in_a_safe_state` | Tried against a simulated machine. |
+| ALVL-039 | The stream stops when a corrected Z would go below the floor or the correction of Z passes its limit, and 0 is no limit for the correction. | implemented | done | simulator | `streaming::the_limits_of_depth_and_of_correction_stop_the_stream` | - |
+| ALVL-040 | A line that cannot be levelled (an arc while arcs are refused, a code that moves the origin, a program that is levelled already) is never sent. | implemented | done | host-test | `streaming::a_line_that_cannot_be_levelled_is_never_sent` | - |
+| ALVL-041 | Random programs are sent or stopped without a panic, what is sent keeps the limits, and a program that is not stopped is the one the file correction writes. | implemented | done | simulator | `streaming::random_programs_are_sent_or_stopped_without_a_panic` | Seeded generation, not a continuous fuzzer. |
+| ALVL-042 | The limits of the stream are settings with ranges, and the `stream` command stops with the exit code 2 and keeps the lines that were sent. | implemented | done | host-test | `streaming::the_settings_hold_the_limits_and_the_command_stops_with_the_code_2` | - |
+| ALVL-043 | No chord of a cut arc strays from the arc by more than the tolerance that is a setting. | implemented | done | host-test | `arcs::the_pieces_never_stray_from_the_arc_by_more_than_the_tolerance` | Seeded generation of arcs. |
+| ALVL-044 | A full circle, an arc given by its radius (positive or negative) and a helix are cut right. | implemented | done | host-test | `arcs::a_full_circle_the_radius_form_and_a_helix_are_cut_right` | - |
+| ALVL-045 | An arc with no centre, a radius that is too small, an end off the circle, R together with I or J, or several turns is refused with its line, and arcs stay refused unless the setting says cut. | implemented | done | host-test | `arcs::what_cannot_be_told_is_refused_with_its_line` | - |
+| ALVL-046 | The settings `arcs` and `arc-tolerance-mm` and the options `--arcs` and `--arc-tolerance` switch the cutting of arcs on, with their ranges. | implemented | done | host-test | `arcs::the_settings_and_the_command_line_switch_arcs_on` | - |
+| ALVL-047 | Random programs with arcs are cut or refused without a panic, and so is a program cut at any byte. | implemented | done | host-test | `arcs::random_programs_with_arcs_are_cut_or_refused_without_a_panic` | Seeded generation, not a continuous fuzzer. |
+| ALVL-048 | A machine that is moving, in alarm or silent gives no place for the start. | implemented | done | simulator | `start_pos::a_machine_in_alarm_or_silent_gives_no_place` | Tried against the simulated GRBL. |
+| ALVL-049 | A saved report of GRBL or the answer to M114 of Marlin gives the place, and one that cannot be trusted (no work offset, moving, in alarm, not a number) is refused. | implemented | done | host-test | `start_pos::a_saved_report_gives_the_place_and_one_that_cannot_be_trusted_is_refused` | - |
+| ALVL-050 | A damaged report never panics and gives only places within the limits. | implemented | done | host-test | `start_pos::damaged_reports_never_panic_and_give_only_places_within_the_limits` | Seeded generation, not a continuous fuzzer. |
+| ALVL-051 | `--start` and `--start-report` set where the program starts, are refused together, and name the option when they are wrong. | implemented | done | host-test | `start_pos::the_command_line_takes_the_start_from_a_place_or_from_a_saved_report` | - |
+| ALVL-052 | An arc is modal like the other moves, and a straight move ends it. | implemented | done | host-test | `arcs::an_arc_is_modal_and_a_straight_move_ends_it` | - |
+| ALVL-053 | A piece of an arc is never longer than the segment of the settings either. | implemented | done | host-test | `arcs::a_piece_is_never_longer_than_the_segment_either` | - |
+| ALVL-054 | The place read through a cable that cuts the answers and adds noise is the right one or none. | implemented | done | simulator | `start_pos::the_place_is_never_wrong_on_a_cable_that_cuts_and_adds_noise` | Seeded cable of the simulated GRBL. |

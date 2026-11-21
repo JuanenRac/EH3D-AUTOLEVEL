@@ -93,6 +93,45 @@
           }
         },
         {
+          "name": "arcs.rs",
+          "desc": {
+            "en": "arcs (G2, G3) cut into straight pieces within a tolerance",
+            "es": "arcos (G2, G3) partidos en trozos rectos dentro de una tolerancia",
+            "de": "Bögen (G2, G3) in gerade Stücke innerhalb einer Toleranz geschnitten",
+            "fr": "arcs (G2, G3) coupés en morceaux droits dans une tolérance",
+            "it": "archi (G2, G3) spezzati in tratti rettilinei entro una tolleranza",
+            "ja": "円弧（G2、G3）を許容差内の直線小片に分割",
+            "zh": "把圆弧（G2、G3）在容差内切成直线小段",
+            "pt": "arcos (G2, G3) partidos em pedaços retos dentro de uma tolerância"
+          }
+        },
+        {
+          "name": "stream.rs",
+          "desc": {
+            "en": "the emitter that levels line by line, its limits and a simulated machine",
+            "es": "el emisor que nivela línea a línea, sus límites y una máquina simulada",
+            "de": "der Sender, der zeilenweise nivelliert, seine Grenzen und eine simulierte Maschine",
+            "fr": "l'émetteur qui nivelle ligne par ligne, ses limites et une machine simulée",
+            "it": "l'emettitore che livella riga per riga, i suoi limiti e una macchina simulata",
+            "ja": "1行ずつ補正するエミッタ、その上限、模擬機械",
+            "zh": "逐行调平的发射器、其上限和一台模拟机器",
+            "pt": "o emissor que nivela linha a linha, os seus limites e uma máquina simulada"
+          }
+        },
+        {
+          "name": "start.rs",
+          "desc": {
+            "en": "the start position, read from a controller or a saved report",
+            "es": "la posición inicial, leída de un controlador o de un informe guardado",
+            "de": "die Startposition, von einer Steuerung oder einem gespeicherten Bericht gelesen",
+            "fr": "la position de départ, lue sur un contrôleur ou dans un rapport enregistré",
+            "it": "la posizione iniziale, letta da un controller o da un rapporto salvato",
+            "ja": "コントローラまたは保存した報告から読む開始位置",
+            "zh": "从控制器或已保存的报告读取的起始位置",
+            "pt": "a posição inicial, lida de um controlador ou de um relatório guardado"
+          }
+        },
+        {
           "name": "surface.rs",
           "desc": {
             "en": "a part of the logic",
@@ -214,6 +253,45 @@
             "ja": "A 軸の回転による Z 補正、その設定キーとオプションのテスト",
             "zh": "A 轴转动的 Z 补偿及其设置键和选项的测试",
             "pt": "testes da correção de Z pela rotação do eixo A, das suas chaves de definições e das suas opções"
+          }
+        },
+        {
+          "name": "arcs.rs",
+          "desc": {
+            "en": "tests of the cutting of arcs, its tolerance and its settings",
+            "es": "pruebas del corte de arcos, su tolerancia y sus ajustes",
+            "de": "Tests des Schneidens von Bögen, ihrer Toleranz und ihrer Einstellungen",
+            "fr": "tests de la coupe des arcs, de sa tolérance et de ses réglages",
+            "it": "test del taglio degli archi, della loro tolleranza e delle impostazioni",
+            "ja": "円弧の分割、その許容差、設定のテスト",
+            "zh": "圆弧切分、容差及其设置的测试",
+            "pt": "testes do corte de arcos, da sua tolerância e das suas definições"
+          }
+        },
+        {
+          "name": "streaming.rs",
+          "desc": {
+            "en": "tests of the emitter: the safe stop, the limits and the command with the code 2",
+            "es": "pruebas del emisor: la parada segura, los límites y la orden con el código 2",
+            "de": "Tests des Senders: sicherer Halt, Grenzen und der Befehl mit Code 2",
+            "fr": "tests de l'émetteur : l'arrêt sûr, les limites et la commande avec le code 2",
+            "it": "test dell'emettitore: l'arresto sicuro, i limiti e il comando con il codice 2",
+            "ja": "エミッタのテスト：安全停止、上限、終了コード 2 のコマンド",
+            "zh": "发射器测试：安全停止、上限以及退出码 2 的命令",
+            "pt": "testes do emissor: a paragem segura, os limites e o comando com o código 2"
+          }
+        },
+        {
+          "name": "start_pos.rs",
+          "desc": {
+            "en": "tests of the start position read from a simulated machine and from reports",
+            "es": "pruebas de la posición inicial leída de una máquina simulada y de informes",
+            "de": "Tests der Startposition aus einer simulierten Maschine und aus Berichten",
+            "fr": "tests de la position de départ lue sur une machine simulée et dans des rapports",
+            "it": "test della posizione iniziale letta da una macchina simulata e da rapporti",
+            "ja": "模擬機械と報告から読む開始位置のテスト",
+            "zh": "从模拟机器和报告读取起始位置的测试",
+            "pt": "testes da posição inicial lida de uma máquina simulada e de relatórios"
           }
         },
         {
