@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Behaviour tests at the exact edge:** `tests/behaviour.rs` adds 18 deterministic tests without changing the behaviour: the words of a line (comments, checksum, signs and points, the line named in each error), the way a coordinate is written (a value that rounds to zero has no sign, read back within half a decimal), the correction of the axis A, the range of each setting with both ends, and the surface between the measured points (the bicubic surface goes through every measured point of seeded maps, a plane is reproduced exactly inside the grid, the nearest edge outside it, the doubtful readings with a strict limit and the distance from the plane).
+
 ## [0.1.2] - Arcs cut into pieces that follow the table, the program levelled line by line through a safe emitter and the start position taken from a report of the machine
 
 - **The pictures of the README are new:** they were written again by the picture mode (`--shot`) of the published program.
