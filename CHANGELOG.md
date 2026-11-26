@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - Safer stop of a stream, stricter lines and atomic output
+
 - **The lift after a stopped stream could take the tool down (fix):** the two lines given after a stop were worked out from the line that had just been refused, so a tool standing at Z50 could be sent down to Z5, and a map with a bad reading could send it deep into the table or far up. They now come from the last line that was given out, or from the start position when nothing moved yet.
 - **A dwell with axis words of the modal move (fix):** `G4 P1 X50` or `G4 P1 Z-5` was passed on as it was, so the machine made that move without its correction. It is refused now; `G4 X2`, the dwell time on some controllers, goes through as before.
 - **Files are written whole or not at all (fix):** `stream --out` and `demo-map` wrote over the target directly, and `apply` and the window used one fixed temporary name, so two runs could mix their text and a file of that name was lost. Every write now goes through a temporary file of its own and a rename.
