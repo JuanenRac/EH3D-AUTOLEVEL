@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Two lines that could cut without the correction, or cut what was not asked (fixes):** a dwell and a move on the same line (`G4 P1 G1 X50`) was passed on as it was, so that move ran with no correction of Z; it is now refused with the number of the line. After `G80` the modal move is cancelled, so axis words alone are refused instead of being written as a cutting move. Two new tests.
 - **Behaviour tests at the exact edge:** `tests/behaviour.rs` adds 18 deterministic tests without changing the behaviour: the words of a line (comments, checksum, signs and points, the line named in each error), the way a coordinate is written (a value that rounds to zero has no sign, read back within half a decimal), the correction of the axis A, the range of each setting with both ends, and the surface between the measured points (the bicubic surface goes through every measured point of seeded maps, a plane is reproduced exactly inside the grid, the nearest edge outside it, the doubtful readings with a strict limit and the distance from the plane).
 - The shared workflow checker (`tools/workflow_hygiene.py`) is the current one of the documentation hub: the filters under a trigger (branches, paths, types) are no longer read as events.
 

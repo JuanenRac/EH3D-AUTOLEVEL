@@ -260,6 +260,42 @@ fn the_bicubic_option_corrects_a_program() {
 }
 
 #[test]
+fn a_dwell_on_the_line_of_a_move_is_refused_and_never_leaves_the_move_uncorrected() {
+    let tilted = tilted();
+    let o = Options::default();
+    for line in ["G4 P1 G1 X50 Y0", "G1 X50 Y0 G4 P1", "G0 Z5 G4 P0.5"] {
+        let program = format!("G90 G21\nG0 X0 Y0 Z1\n{line}\n");
+        let err = correct(&program, &tilted, &o).unwrap_err();
+        assert!(err.contains("line 3") && err.contains("G4"), "{line}: {err}");
+    }
+    // a motion word with no axis moves nothing
+    let (out, _) = correct("G90 G21\nG1 G4 P1\n", &tilted, &o).unwrap();
+    assert_eq!(out, "G90 G21\nG1 G4 P1\n");
+}
+
+#[test]
+fn after_g80_axis_words_alone_are_not_turned_into_a_cut() {
+    let tilted = tilted();
+    let o = Options::default();
+    for program in [
+        "G90 G21\nG1 X1 Y1 Z1 F100\nG80\nX50 Y0\n",
+        "G90 G21\nG1 X1 Y1 Z1 F100\nG80 X50\n",
+    ] {
+        let err = correct(program, &tilted, &o).unwrap_err();
+        assert!(err.contains("before any G0 or G1"), "{program}: {err}");
+    }
+    // a line that says how it moves keeps working, with G80 before or after it
+    for line in ["G80 G0 Z5", "G0 G80 Z5"] {
+        let program = format!("G90 G21\nG1 X1 Y1 Z1 F100\n{line}\nX2 Y2\n");
+        let (out, _) = correct(&program, &tilted, &o).unwrap();
+        assert!(out.lines().last().unwrap().starts_with("G0 X2"), "{line}: {out}");
+    }
+    // the safety line at the head of a program stays as it is
+    let (out, _) = correct("G17 G21 G90 G40 G49 G80\nG0 X1 Y1\n", &tilted, &o).unwrap();
+    assert!(out.starts_with("G17 G21 G90 G40 G49 G80\n"), "{out}");
+}
+
+#[test]
 fn codes_that_move_the_origin_or_the_offsets_are_refused_and_never_become_moves() {
     let tilted = tilted();
     let o = Options::default();

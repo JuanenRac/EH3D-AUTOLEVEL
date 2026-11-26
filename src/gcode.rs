@@ -564,6 +564,11 @@ impl<'a> Leveller<'a> {
         // the modal G words that share the line with a move (G90, G54...) go in front of the rewritten move
         let mut kept: Vec<String> = Vec::new();
         let mut mode = self.mode;
+        // whether the line itself says how it moves, and whether it cancels the modal move (G80)
+        let has_motion = w
+            .iter()
+            .any(|&(l, v)| l == 'G' && (v == 0.0 || v == 1.0 || v == 2.0 || v == 3.0));
+        let mut cancels = false;
         for &(letter, value) in &w {
             match (letter, value) {
                 ('G', v)
@@ -580,6 +585,7 @@ impl<'a> Leveller<'a> {
                         || v == 90.1
                         || v == 91.1 =>
                 {
+                    cancels |= v == 80.0;
                     if v == 90.1 {
                         self.arc_absolute = true;
                     } else if v == 91.1 {
@@ -614,7 +620,17 @@ impl<'a> Leveller<'a> {
             }
         }
         if dwell {
+            // a controller dwells and then makes the move of the same line: passing the line on would leave that move without its correction
+            if has_motion && moves_here {
+                return Err(format!(
+                    "line {n}: a dwell (G4) and a move on the same line are not supported: write the dwell on a line of its own"
+                ));
+            }
             moves_here = false;
+        }
+        // after G80 there is no modal move: axis words alone must not become a cutting move
+        if cancels && !has_motion {
+            mode = None;
         }
         // a full circle has no X or Y: its centre or radius is what says it is a move
         if !dwell
