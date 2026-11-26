@@ -219,23 +219,24 @@ fn colour_by_table(segs: &mut [Seg], map: &HeightMap, method: Method) {
 }
 
 /// The text of a file when it is not larger than `limit` bytes: the command line reads with it, so that a file by mistake does not fill the memory.
+/// The limit is on what is read, not on the size the system tells: a device or a pipe tells none, and a file can grow while it is being read.
 pub fn read_limited(path: &Path, limit: u64) -> Result<String, String> {
+    use std::io::Read;
     let shown = path.display();
-    let meta = std::fs::metadata(path).map_err(|e| format!("{shown}: {e}"))?;
-    if meta.len() > limit {
+    let file = std::fs::File::open(path).map_err(|e| format!("{shown}: {e}"))?;
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("{shown}: {e}"))?;
+    if bytes.len() as u64 > limit {
         return Err(format!("{shown}: the file is larger than {limit} bytes"));
     }
-    std::fs::read_to_string(path).map_err(|e| format!("{shown}: {e}"))
+    String::from_utf8(bytes).map_err(|_| format!("{shown}: the file is not text"))
 }
 
 /// The text of a file, if it is not too big.
 fn read_text(path: &Path) -> Result<String, String> {
-    let shown = path.display();
-    let meta = std::fs::metadata(path).map_err(|e| format!("{shown}: {e}"))?;
-    if meta.len() > MAX_FILE_BYTES {
-        return Err(format!("{shown}: the file is larger than the window reads"));
-    }
-    std::fs::read_to_string(path).map_err(|e| format!("{shown}: {e}"))
+    read_limited(path, MAX_FILE_BYTES)
 }
 
 /// Whether the text is a height map (the first line of the file of the probe is `levelling 1`) and not a program.
@@ -246,14 +247,46 @@ pub fn looks_like_map(text: &str) -> bool {
         .is_some_and(|l| l.starts_with("levelling"))
 }
 
-/// Written beside and renamed, so that a file is never left half written (the command line does the same).
-fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
-    let tmp = PathBuf::from(format!("{}.tmp", path.display()));
-    std::fs::write(&tmp, text)
+/// Written beside and renamed, so that a file is never left half written (the command line writes with it too). The temporary file has a name of its
+/// own for each process and call and is only ever made new, so two runs never write into the same one and no file of the person is taken for it.
+/// A target that is not a regular file (a device, a pipe) cannot be replaced and is written to as it is.
+pub fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let fail = |e: std::io::Error| format!("{}: {e}", path.display());
+    let old = std::fs::metadata(path).ok();
+    if old.as_ref().is_some_and(|m| !m.is_file()) {
+        return std::fs::write(path, text).map_err(fail);
+    }
+    if old.as_ref().is_some_and(|m| m.permissions().readonly()) {
+        return Err(format!("{}: the file is read only", path.display()));
+    }
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(format!(
+        ".{}.{}.tmp",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let tmp = PathBuf::from(tmp);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
+        .map_err(fail)?;
+    let written = file
+        .write_all(text.as_bytes())
+        .and_then(|()| match &old {
+            Some(m) => file.set_permissions(m.permissions()),
+            None => Ok(()),
+        })
+        .and_then(|()| file.sync_all());
+    drop(file);
+    written
         .and_then(|()| std::fs::rename(&tmp, path))
         .map_err(|e| {
             let _ = std::fs::remove_file(&tmp);
-            format!("{}: {e}", path.display())
+            fail(e)
         })
 }
 

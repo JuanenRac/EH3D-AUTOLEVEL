@@ -14,11 +14,10 @@ use eh3d_autolevel::server;
 use eh3d_autolevel::start;
 use eh3d_autolevel::stream::{send_program, SimMachine, StreamLimits};
 use eh3d_autolevel::surface::{map_json, missing, rms_from_plane, spike_text, spikes, Method};
-use eh3d_autolevel::window::{read_limited, MAX_FILE_BYTES};
+use eh3d_autolevel::window::{read_limited, write_atomic, MAX_FILE_BYTES};
 use eh3d_levelling::{simulated_table, Grid, HeightMap};
 use eh3d_serverclient::Settings as LinkSettings;
 use std::env;
-use std::fs;
 use std::process::ExitCode;
 
 const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the height map of the table
@@ -192,7 +191,10 @@ fn stream_command(mut args: Vec<String>) -> Result<bool, String> {
     if let Some(path) = &out_path {
         let mut body: Vec<&str> = outcome.sent.iter().map(String::as_str).collect();
         body.extend(outcome.safe.iter().map(String::as_str));
-        fs::write(path, format!("{}\n", body.join("\n"))).map_err(|e| format!("{path}: {e}"))?;
+        write_atomic(
+            std::path::Path::new(path),
+            &format!("{}\n", body.join("\n")),
+        )?;
     }
     let halt_text = outcome.halt.as_ref().map(|h| h.to_string());
     if json {
@@ -371,7 +373,6 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 return Ok(());
             }
             // written beside and renamed, so that a program levelled in place is never left half written
-            let tmp = format!("{}.tmp", args[2]);
             let corrected = mark_with_header(
                 &out,
                 &map,
@@ -384,12 +385,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                     text.as_str(),
                 )),
             );
-            fs::write(&tmp, &corrected)
-                .and_then(|()| fs::rename(&tmp, &args[2]))
-                .map_err(|e| {
-                    let _ = fs::remove_file(&tmp);
-                    format!("{}: {e}", args[2])
-                })?;
+            write_atomic(std::path::Path::new(&args[2]), &corrected)?;
             if json {
                 println!("{}", report_json(&r, false, doubtful.len()));
             } else {
@@ -590,7 +586,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 let z = map.get(i).unwrap_or(0.0) + num(d, "--bad MM")?;
                 map.set(i, z).map_err(|e| e.to_string())?;
             }
-            fs::write(&args[0], map.to_text()).map_err(|e| format!("{}: {e}", args[0]))?;
+            write_atomic(std::path::Path::new(&args[0]), &map.to_text())?;
             println!("{} points written to {}", map.grid.len(), args[0]);
             if let Some(link) = &link {
                 let (cols_text, rows_text) = (cols.to_string(), rows.to_string());

@@ -277,6 +277,30 @@ fn a_dwell_on_the_line_of_a_move_is_refused_and_never_leaves_the_move_uncorrecte
 }
 
 #[test]
+fn a_dwell_with_axis_words_of_the_modal_move_is_refused_too() {
+    let tilted = tilted();
+    let o = Options::default();
+    // the line names no motion word, but the machine is in G1 and Y or Z are never the time of a dwell
+    for line in [
+        "G4 P1 X50 Y0",
+        "G4 P1 Y3",
+        "G4 P1 Z-5",
+        "Z-5 G4 P1",
+        "G4 P1 X50",
+    ] {
+        let program = format!("G90 G21\nG0 X0 Y0 Z1\nG1 X1 F100\n{line}\n");
+        let err = correct(&program, &tilted, &o).unwrap_err();
+        assert!(
+            err.contains("line 4") && err.contains("G4"),
+            "{line}: {err}"
+        );
+    }
+    // X alone is the time on some controllers and goes through as it is
+    let (out, _) = correct("G90 G21\nG0 X0 Y0 Z1\nG4 X2\n", &tilted, &o).unwrap();
+    assert!(out.ends_with("G4 X2\n"), "{out}");
+}
+
+#[test]
 fn after_g80_axis_words_alone_are_not_turned_into_a_cut() {
     let tilted = tilted();
     let o = Options::default();

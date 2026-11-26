@@ -621,7 +621,11 @@ impl<'a> Leveller<'a> {
         }
         if dwell {
             // a controller dwells and then makes the move of the same line: passing the line on would leave that move without its correction
-            if has_motion && moves_here {
+            // X alone with a G4 is the time on some controllers; with a P the time is there already, and Y or Z are never a time: those words move
+            // the machine in the modal move even when the line names none
+            let has = |c: char| w.iter().any(|&(l, _)| l == c);
+            let axes_move = has('Y') || has('Z') || (has('X') && has('P'));
+            if moves_here && (has_motion || axes_move) {
                 return Err(format!(
                     "line {n}: a dwell (G4) and a move on the same line are not supported: write the dwell on a line of its own"
                 ));
