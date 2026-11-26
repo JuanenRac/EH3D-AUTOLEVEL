@@ -111,6 +111,10 @@ pub struct Streamer<'a> {
     line: usize,
     sent: usize,
     halted: Option<Halt>,
+    /// The Z the tool stands at after the lines that were given out (with the correction), and the correction that went with it. They are kept
+    /// here and not asked to the leveller, which has already taken in a line that the limits then refuse.
+    standing_z: f64,
+    standing_shift: f64,
 }
 
 impl<'a> Streamer<'a> {
@@ -132,13 +136,21 @@ impl<'a> Streamer<'a> {
                 "the limits of the stream are not valid: {limits:?}"
             ));
         }
+        let leveller = Leveller::new(map, opts)?;
+        let (standing_z, standing_shift) = match opts.start {
+            // the place given is where the tool stands, correction included
+            Some(start) => (start[2], start[2] - leveller.position().2),
+            None => (0.0, 0.0),
+        };
         Ok(Streamer {
-            leveller: Leveller::new(map, opts)?,
+            leveller,
             limits,
             decimals: opts.decimals,
             line: 0,
             sent: 0,
             halted: None,
+            standing_z,
+            standing_shift,
         })
     }
 
@@ -182,6 +194,7 @@ impl<'a> Streamer<'a> {
             return stop(self, HaltReason::ShiftTooLarge { shift_mm: worst });
         }
         let lines: Vec<String> = out.lines().map(str::to_string).collect();
+        let mut last_z = None;
         for l in &lines {
             let z = words(l, n)
                 .ok()
@@ -189,6 +202,12 @@ impl<'a> Streamer<'a> {
             if let Some(z) = z.filter(|z| *z < lim.min_z_mm) {
                 return stop(self, HaltReason::TooDeep { z_mm: z });
             }
+            last_z = z.or(last_z);
+        }
+        // only now is the line given out: what it says about Z is where the tool will stand
+        if let Some(z) = last_z {
+            self.standing_z = z;
+            self.standing_shift = self.leveller.last_shift();
         }
         self.line = n;
         self.sent += lines.len();
@@ -211,10 +230,9 @@ impl<'a> Streamer<'a> {
     }
 
     /// What a sender should do after a stop: the spindle off, and a lift to the safe Z (with the correction of the place), never lower than where the tool stands.
+    /// The place and the correction are those of the last line that was given out: nothing of a refused line has a say in them.
     pub fn safe_lines(&self) -> Vec<String> {
-        let shift = self.leveller.last_shift();
-        let standing = self.leveller.position().2 + shift;
-        let z = (self.limits.safe_z_mm + shift).max(standing);
+        let z = (self.limits.safe_z_mm + self.standing_shift).max(self.standing_z);
         vec!["M5".to_string(), format!("G0 Z{}", coord(z, self.decimals))]
     }
 }

@@ -482,3 +482,61 @@ fn the_settings_hold_the_limits_and_the_command_stops_with_the_code_2() {
     assert_eq!(run(&["stream", &map, &good, "--nope"]).0, Some(1));
     assert_eq!(run(&["stream", &map, "no-such-file.nc"]).0, Some(1));
 }
+
+/// The two lines a sender is given after a stop, for a program that stops, on `map` with the options `opts`.
+fn stopped_safe_lines(map: &HeightMap, opts: &Options, program: &str) -> Vec<String> {
+    let mut machine = SimMachine::new(map, (0.0, 0.0), Method::Bilinear);
+    let outcome = send_program(program, map, opts, StreamLimits::default(), &mut machine).unwrap();
+    assert!(outcome.halt.is_some(), "{:?}", outcome.sent);
+    outcome.safe
+}
+
+#[test]
+fn the_lift_after_a_stop_never_takes_the_tool_below_where_it_stands() {
+    // the tool stands at Z50; the refused line would have gone down to -1, and nothing of it was given out
+    let map = table(0.0, 0.0);
+    let safe = stopped_safe_lines(
+        &map,
+        &Options::default(),
+        "G0 Z50\nG0 X10 Y10\nG1 X500 Y10 Z-1 F100\n",
+    );
+    assert_eq!(safe, ["M5", "G0 Z50.000"]);
+}
+
+#[test]
+fn the_lift_after_a_stop_does_not_use_the_correction_of_the_line_that_was_refused() {
+    // one point of the map is 20 mm below the rest, as a probe that slipped would leave it
+    let mut map = table(0.0, 0.0);
+    let hole = (0..map.grid.len())
+        .find(|&i| map.grid.point(i) == (50.0, 50.0))
+        .unwrap();
+    map.set(hole, -20.0).unwrap();
+    let safe = stopped_safe_lines(
+        &map,
+        &Options::default(),
+        "G0 Z5\nG0 X0 Y0\nG1 Z-0.5 F100\nG1 X50 Y50\n",
+    );
+    assert_eq!(safe, ["M5", "G0 Z5.000"]);
+    // and a point 20 mm above the rest does not send the tool 25 mm up
+    map.set(hole, 20.0).unwrap();
+    let safe = stopped_safe_lines(
+        &map,
+        &Options::default(),
+        "G0 Z5\nG0 X0 Y0\nG1 Z-0.5 F100\nG1 X50 Y50\n",
+    );
+    assert_eq!(safe, ["M5", "G0 Z5.000"]);
+}
+
+#[test]
+fn the_lift_after_a_stop_on_the_first_line_stays_at_the_start_that_was_given() {
+    let map = table(0.002, 0.001);
+    let opts = Options {
+        start: Some([10.0, 10.0, 50.0]),
+        ..Options::default()
+    };
+    let safe = stopped_safe_lines(&map, &opts, "G1 X500 Y10 F100\n");
+    assert_eq!(safe, ["M5", "G0 Z50.000"]);
+    // a line that writes no Z does not move the place the tool is taken to be at
+    let safe = stopped_safe_lines(&map, &opts, "M3 S1000\nG4 P1\nG1 X500 Y10 F100\n");
+    assert_eq!(safe, ["M5", "G0 Z50.000"]);
+}
