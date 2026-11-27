@@ -239,22 +239,46 @@ pub const DEFAULT_DECIMALS: usize = 3;
 pub const MIN_DECIMALS: usize = 1;
 pub const MAX_DECIMALS: usize = 6;
 
-/// The words of a line without its comments: `(...)` and everything after `;`.
+/// Whether what follows a `*` is the checksum of a numbered line: digits, and after them nothing but a comment.
+fn is_checksum(rest: &str) -> bool {
+    let rest = rest.trim_start();
+    let after = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+    after.len() < rest.len() && {
+        let after = after.trim_start();
+        after.is_empty() || after.starts_with(';') || after.starts_with('(')
+    }
+}
+
+/// The words of a line without its comments: `(...)` and everything after `;`. A bracket inside a comment or a closing one with no comment is refused (a controller ends the
+/// comment at the first `)`, so what follows would be words for it), and so is a `*` that is not the checksum of the line.
 pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
     let mut clean = String::new();
-    let mut depth = 0;
-    for c in line.chars() {
+    let mut open = false;
+    for (at, c) in line.char_indices() {
         match c {
-            ';' if depth == 0 => break,
+            ';' if !open => break,
             // the checksum of a numbered line (`N10 G1 X5*45`) is not a word
-            '*' if depth == 0 => break,
-            '(' => depth += 1,
-            ')' if depth > 0 => depth -= 1,
-            _ if depth == 0 => clean.push(c),
+            '*' if !open => {
+                if line.get(at + 1..).is_some_and(is_checksum) {
+                    break;
+                }
+                return Err(format!(
+                    "line {number}: '*' is not followed by the checksum of the line: what comes after it would be lost"
+                ));
+            }
+            '(' if !open => open = true,
+            ')' if open => open = false,
+            '(' | ')' => {
+                return Err(format!(
+                    "line {number}: a bracket inside a comment or without one: a controller ends a comment at the first ')'"
+                ))
+            }
+            _ if !open => clean.push(c),
             _ => {}
         }
     }
-    let chars: Vec<char> = clean.chars().filter(|c| !c.is_whitespace()).collect();
+    // only the blanks of ASCII count for nothing: another one reaches the controller as a byte it may obey
+    let chars: Vec<char> = clean.chars().filter(|c| !c.is_ascii_whitespace()).collect();
     let mut out = Vec::new();
     let mut i = 0;
     while i < chars.len() {
@@ -286,7 +310,7 @@ pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
 /// are held to the strict rules of the words; the strictness is about positions, not about every character a controller accepts.
 fn is_not_a_move(line: &str) -> bool {
     let t = line.trim_start();
-    if t.starts_with('$') || t.starts_with('#') {
+    if t.starts_with('$') || is_assignment(t) {
         return true;
     }
     let upper = t.to_ascii_uppercase();
@@ -295,6 +319,63 @@ fn is_not_a_move(line: &str) -> bool {
             .strip_prefix(m)
             .is_some_and(|rest| !rest.starts_with(|c: char| c.is_ascii_digit() || c == '.'))
     })
+}
+
+/// Whether the line is one parameter assignment and nothing else (`#1=5`, `#<depth> = [#1*2] (note)`): a move written after it would pass without its correction.
+fn is_assignment(line: &str) -> bool {
+    let code = line.split([';', '(']).next().unwrap_or("").trim();
+    let Some((name, value)) = code.strip_prefix('#').and_then(|c| c.split_once('=')) else {
+        return false;
+    };
+    let named = |n: &str| {
+        let number = !n.is_empty() && n.chars().all(|c| c.is_ascii_digit());
+        number || (n.len() > 2 && n.starts_with('<') && n.find('>') == Some(n.len() - 1))
+    };
+    let value = value.trim();
+    named(name.trim())
+        && (value.parse::<f64>().is_ok()
+            || value.strip_prefix('#').is_some_and(named)
+            || is_one_expression(value))
+}
+
+/// Whether the text is one expression in square brackets, with nothing after it.
+fn is_one_expression(text: &str) -> bool {
+    let mut depth = 0usize;
+    for (at, c) in text.char_indices() {
+        match c {
+            '[' => depth += 1,
+            ']' if depth > 0 => {
+                depth -= 1;
+                if depth == 0 {
+                    return at + 1 == text.len();
+                }
+            }
+            _ if depth == 0 => return false,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Refuses a word written twice on a line and two codes of one group: a controller refuses such a line, and rewriting it would keep one of them without saying so.
+fn refuse_repeated(words: &[(char, f64)], n: usize) -> Result<(), String> {
+    for (i, &(letter, _)) in words.iter().enumerate() {
+        if !matches!(letter, 'G' | 'M') && words[..i].iter().any(|&(l, _)| l == letter) {
+            return Err(format!("line {n}: the word {letter} is written twice"));
+        }
+    }
+    let count = |letter: char, group: &[f64]| {
+        words
+            .iter()
+            .filter(|&&(l, v)| l == letter && group.contains(&v))
+            .count()
+    };
+    if count('G', &[0.0, 1.0, 2.0, 3.0]) > 1 || count('M', &[3.0, 4.0, 5.0]) > 1 {
+        return Err(format!(
+            "line {n}: two codes of the same group on one line: a controller refuses it"
+        ));
+    }
+    Ok(())
 }
 
 /// The `$` commands of GRBL that only ask: the help, the settings, the offsets, the state of the parser, the build and the startup lines. Every other one moves the machine
@@ -309,6 +390,10 @@ fn refuse_hidden_commands(line: &str, n: usize) -> Result<(), String> {
         return Err(format!(
             "line {n}: a carriage return in the middle of the line: a controller would read what follows it as another line"
         ));
+    }
+    // a control character is obeyed by the controller wherever it stands, also in a comment or in the text of a message
+    if line.chars().any(|c| c.is_control() && c != '\t') {
+        return Err(format!("line {n}: a control character in the line"));
     }
     if !line.starts_with('$') {
         return Ok(());
@@ -597,6 +682,7 @@ impl<'a> Leveller<'a> {
             return Ok(());
         }
         let w = words(raw, n)?;
+        refuse_repeated(&w, n)?;
         let mut moves_here = false;
         let mut dwell = false;
         // the modal G words that share the line with a move (G90, G54...) go in front of the rewritten move
@@ -619,7 +705,7 @@ impl<'a> Leveller<'a> {
                         || v == 64.0
                         || v == 80.0
                         || v == 94.0
-                        || (54.0..=59.0).contains(&v)
+                        || ((54.0..=59.0).contains(&v) && v.fract() == 0.0)
                         || v == 90.1
                         || v == 91.1 =>
                 {
