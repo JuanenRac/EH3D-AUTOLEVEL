@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Third-party notices in every package (`docs/THIRD_PARTY_NOTICES`):** the packages of the releases now carry the copyright notices and licence texts of the Rust crates and of the data the program is built with, and the CI fails when a new dependency or licence is not in the file.
+
 - **Accents in a comment no longer stop the stream and never reach the controller:** `stream` stops and `apply` warns only for `!`, `~`, `?` and control characters in a comment. The lines that pass through carry the characters outside ASCII of their comments as `_`, because GRBL takes some of their bytes as commands; outside a comment such a character stops `stream`. 1 new test. Host-tested only.
 
 ## [0.1.4] - Real-time characters stop the stream and the input files are never written over (not tried on a machine)
