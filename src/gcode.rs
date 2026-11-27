@@ -416,7 +416,8 @@ fn refuse_repeated(words: &[(char, f64)], n: usize) -> Result<(), String> {
             .filter(|&&(l, v)| l == letter && group.contains(&v))
             .count()
     };
-    if count('G', &[0.0, 1.0, 2.0, 3.0]) > 1 || count('M', &[3.0, 4.0, 5.0]) > 1 {
+    // G80 is of the group of the moves, as the shared G-code reader holds it
+    if count('G', &[0.0, 1.0, 2.0, 3.0, 80.0]) > 1 || count('M', &[3.0, 4.0, 5.0]) > 1 {
         return Err(format!(
             "line {n}: two codes of the same group on one line: a controller refuses it [word-repeated]"
         ));
@@ -735,7 +736,7 @@ impl<'a> Leveller<'a> {
         // the modal G words that share the line with a move (G90, G54...) go in front of the rewritten move
         let mut kept: Vec<String> = Vec::new();
         let mut mode = self.mode;
-        // whether the line itself says how it moves, and whether it cancels the modal move (G80)
+        // whether the line itself says how it moves, and whether it cancels the modal move (G80, never on the same line)
         let has_motion = w
             .iter()
             .any(|&(l, v)| l == 'G' && (v == 0.0 || v == 1.0 || v == 2.0 || v == 3.0));
@@ -811,7 +812,7 @@ impl<'a> Leveller<'a> {
             moves_here = false;
         }
         // after G80 there is no modal move: axis words alone must not become a cutting move
-        if cancels && !has_motion {
+        if cancels {
             mode = None;
         }
         // a full circle has no X or Y: its centre or radius is what says it is a move

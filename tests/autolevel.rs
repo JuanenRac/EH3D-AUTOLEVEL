@@ -311,15 +311,23 @@ fn after_g80_axis_words_alone_are_not_turned_into_a_cut() {
         let err = correct(program, &tilted, &o).unwrap_err();
         assert!(err.contains("before any G0 or G1"), "{program}: {err}");
     }
-    // a line that says how it moves keeps working, with G80 before or after it
-    for line in ["G80 G0 Z5", "G0 G80 Z5"] {
+    // G80 and a move are two codes of one group: refused on the same line, whichever comes first
+    for line in ["G80 G0 Z5", "G0 G80 Z5", "G80 G1 X2"] {
         let program = format!("G90 G21\nG1 X1 Y1 Z1 F100\n{line}\nX2 Y2\n");
-        let (out, _) = correct(&program, &tilted, &o).unwrap();
+        let err = correct(&program, &tilted, &o).unwrap_err();
         assert!(
-            out.lines().last().unwrap().starts_with("G0 X2"),
-            "{line}: {out}"
+            err.contains("line 3") && err.contains("[word-repeated]"),
+            "{line}: {err}"
         );
     }
+    // on lines of their own the program goes on
+    let (out, _) = correct(
+        "G90 G21\nG1 X1 Y1 Z1 F100\nG80\nG0 Z5\nX2 Y2\n",
+        &tilted,
+        &o,
+    )
+    .unwrap();
+    assert!(out.lines().last().unwrap().starts_with("G0 X2"), "{out}");
     // the safety line at the head of a program stays as it is
     let (out, _) = correct("G17 G21 G90 G40 G49 G80\nG0 X1 Y1\n", &tilted, &o).unwrap();
     assert!(out.starts_with("G17 G21 G90 G40 G49 G80\n"), "{out}");
