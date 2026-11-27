@@ -339,6 +339,8 @@ pub enum Status {
     },
     Computed(Report),
     Written(String),
+    /// Written, with comments that hold characters GRBL obeys at once: the file, how many lines and the first one.
+    WrittenRealtime(String, usize, usize),
     NeedProgram,
     NeedMap,
     BadValue(Msg),
@@ -373,16 +375,32 @@ impl Status {
                 &[name, &measured.to_string(), &total.to_string()],
             ),
             Status::Simulated { points } => fill(Msg::Simulated.tr(lang), &[&points.to_string()]),
-            Status::Computed(r) => fill(
-                Msg::Computed.tr(lang),
-                &[
-                    &r.moves.to_string(),
-                    &r.pieces_added.to_string(),
-                    &format!("{:+.4}", r.shift_min),
-                    &format!("{:+.4}", r.shift_max),
-                ],
-            ),
+            Status::Computed(r) => {
+                let mut text = fill(
+                    Msg::Computed.tr(lang),
+                    &[
+                        &r.moves.to_string(),
+                        &r.pieces_added.to_string(),
+                        &format!("{:+.4}", r.shift_min),
+                        &format!("{:+.4}", r.shift_max),
+                    ],
+                );
+                if r.realtime_lines > 0 {
+                    text.push_str(" - ");
+                    text.push_str(&realtime_text(
+                        lang,
+                        r.realtime_lines,
+                        r.realtime_first_line,
+                    ));
+                }
+                text
+            }
             Status::Written(name) => fill(Msg::Written.tr(lang), &[name]),
+            Status::WrittenRealtime(name, lines, first) => format!(
+                "{} - {}",
+                fill(Msg::Written.tr(lang), &[name]),
+                realtime_text(lang, *lines, *first)
+            ),
             Status::NeedProgram => Msg::NeedProgram.tr(lang).to_string(),
             Status::NeedMap => Msg::NeedMap.tr(lang).to_string(),
             Status::BadValue(label) => fill(Msg::BadValue.tr(lang), &[label.tr(lang)]),
@@ -390,6 +408,14 @@ impl Status {
             Status::Failed(e) => fill(Msg::Failed.tr(lang), &[e]),
         }
     }
+}
+
+/// The sentence about the comments that hold a character GRBL obeys at once, with its code.
+fn realtime_text(lang: Lang, lines: usize, first: usize) -> String {
+    fill(
+        Msg::RealtimeComment.tr(lang),
+        &[&lines.to_string(), &first.to_string()],
+    )
 }
 
 /// The state of the whole window.
@@ -747,9 +773,14 @@ impl Window {
             &done.options,
             source.as_ref().map(|(n, t)| (n.as_str(), *t)),
         );
+        let (lines, first) = (done.report.realtime_lines, done.report.realtime_first_line);
         match write_atomic(path, &text) {
             Ok(()) => {
-                self.status = Status::Written(name_of(path));
+                self.status = if lines > 0 {
+                    Status::WrittenRealtime(name_of(path), lines, first)
+                } else {
+                    Status::Written(name_of(path))
+                };
                 true
             }
             Err(e) => {

@@ -17,7 +17,7 @@
 
 ---
 
-**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 301 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
+**Vérification d'honnêteté - ce qui fonctionne aujourd'hui :** une bibliothèque Rust et un programme en ligne de commande (`eh3d-autolevel`) avec 303 tests exécutés sur un ordinateur : corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface. Il a une fenêtre (compilée avec `--features gui`) qui ouvre un programme G-code et une carte de hauteurs, montre la table en maillage coloré avec les trajets nivelés dessus et exporte, mais la fenêtre n'a pas encore été vue sur un écran ; n'a pas été essayé sur une machine et n'a pas été vérifié sur une collection de fichiers réels.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.3` |
 | Maturité | Fonctionnel |
-| Tests | 301 |
+| Tests | 303 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non essayé : rien ici n'a fonctionné sur une machine |
 
@@ -46,7 +46,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 |---|---|---|
 | Cœur | 🟡 | corrige le Z d'un programme G-code avec la carte de hauteurs de la table, en coupant les mouvements en morceaux qui suivent la surface ; testé sur un ordinateur avec des entrées normales et abîmées, pas avec une collection de fichiers réels. |
 | Ligne de commande | 🟡 | `eh3d-autolevel` exécute les mêmes fonctions que la bibliothèque et affiche le résultat ; chaque erreur revient sous forme de message et de code de sortie non nul. |
-| Tests | 🟡 | 301 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. Elles incluent une simulation à graine fixe de une session de palpage avec les pannes du nœud palpeur, avec pannes injectées et reprise. |
+| Tests | 🟡 | 303 tests passent (`cargo test`), avec des cas normaux, des cas limites et des entrées abîmées. Elles incluent une simulation à graine fixe de une session de palpage avec les pannes du nœud palpeur, avec pannes injectées et reprise. |
 | Sécurité | 🟡 | Rust sûr et simple (`forbid(unsafe_code)`) : rien ne panique sur les fichiers reçus et une mauvaise valeur est une erreur avec sa raison ; pas de revue indépendante. |
 | Fenêtre | 🟠 | Écrite (egui, `--features gui`) : ouvrir ou déposer un programme et une carte de hauteurs, simuler une table, voir la table en maillage coloré et les trajets nivelés, zoom et déplacement, régler le nivellement, exporter ; sa logique est testée, mais elle n'a pas encore été compilée ni vue sur un écran. |
 | Matériel réel | 🔴 | Non essayé : rien ici n'a été exécuté sur une machine. |
@@ -90,7 +90,7 @@ Comment les parties de ce dépôt s'articulent : qui l'utilise, ce qu'il contien
 * **Tests avec entrées abîmées :** les tests fournissent aussi des fichiers vides, du bruit, des nombres énormes et des fichiers coupés, et aucun ne doit paniquer.
 * **Sans deviner :** une valeur absurde est une erreur qui dit laquelle et pourquoi, jamais un résultat qui n'en a que l'air.
 * **Pas de code unsafe :** `#![forbid(unsafe_code)]` dans la bibliothèque et le programme.
-* **Les lignes qui ne sont pas des déplacements passent telles quelles :** les commandes `$`, les affectations `#` et les messages `M117` et `M118` sont écrits comme ils sont, la somme de contrôle d'une ligne numérotée n'est pas un mot, les mots de broche et d'arrosage (`M3` à `M9`) d'un déplacement découpé vont avec son premier morceau et les mots de fin (`M0`, `M1`, `M2`, `M30`) avec le dernier, et `--max-lines` (5000000 par défaut) refuse un programme qui aurait plus de lignes de sortie. Un déplacement manuel (`$J=`), la prise d'origine (`$H`) et toute autre commande `$` qui n'est pas une simple question (`$`, `$$`, `$#`, `$G`, `$I`, `$N`) sont refusés avec leur ligne, comme une ligne avec un retour chariot au milieu ; la sortie de `apply` et de `stream --out` n'est jamais le programme ni la carte qui sont lus.
+* **Les lignes qui ne sont pas des déplacements passent telles quelles :** les commandes `$`, les affectations `#` et les messages `M117` et `M118` sont écrits comme ils sont, la somme de contrôle d'une ligne numérotée n'est pas un mot, les mots de broche et d'arrosage (`M3` à `M9`) d'un déplacement découpé vont avec son premier morceau et les mots de fin (`M0`, `M1`, `M2`, `M30`) avec le dernier, et `--max-lines` (5000000 par défaut) refuse un programme qui aurait plus de lignes de sortie. Un déplacement manuel (`$J=`), la prise d'origine (`$H`) et toute autre commande `$` qui n'est pas une simple question (`$`, `$$`, `$#`, `$G`, `$I`, `$N`) sont refusés avec leur ligne, comme une ligne avec un retour chariot au milieu ; la sortie de `apply` et de `stream --out` n'est jamais le programme ni la carte qui sont lus. Une ligne reprise telle quelle dont le commentaire contient `!`, `~`, `?` ou un caractère hors ASCII, que GRBL exécute aussitôt, arrête `stream` ; `apply` et la fenêtre écrivent le programme et avertissent avec la première ligne de ce genre (`realtime-character`).
 * **Les axes rotatifs A, B et C sont interpolés :** quand un déplacement de coupe est découpé en morceaux, ses mots `A`, `B` et `C` vont en ligne droite de la valeur qu'ils avaient à celle du déplacement (ils sont modaux et partent de 0), avec les mêmes décimales que X, Y et Z ; le dernier morceau finit exactement sur la cible, et le Z de la table vient toujours de X et Y seulement. Un programme sans mot rotatif est écrit comme avant.
 * **Compensation de Z pour la rotation de l'axe A :** avec `a-axis-compensation = tilt` et `a-axis-radius-mm = r` (ou `--a-compensation tilt --a-radius r`), le Z de chaque déplacement écrit reçoit `r * (1 - cos A)` après la hauteur de la table, avec A en degrés tel que le déplacement le laisse (interpolé morceau par morceau) ; la valeur par défaut est `off`, qui ne change aucune sortie, et un avis sur la sortie d'erreur indique quand elle a été appliquée. La formule est dans `docs/a-axis-compensation.md`.
 * **Les axes B et C :** l'axe B (une rotation autour de Y) a la même compensation avec son propre rayon (`b-axis-compensation = tilt` et `b-axis-radius-mm` dans le fichier, `--b-compensation` et `--b-radius`) et les deux s'additionnent ; l'axe C tourne autour de Z, ne change aucune hauteur et n'en a pas besoin (ses mots sont reportés et interpolés comme ceux de A et B). Une machine simulée parcourt le programme nivelé et vérifie la profondeur sous la table ; rien n'a tourné sur une machine à axes rotatifs. **Un déplacement qui omet un axe :** par défaut le programme est supposé démarrer à 0 sur chaque axe ; `unknown-axis = refuse` (`--unknown-axis refuse`) refuse, avec le numéro de la ligne, un déplacement qui omet X, Y ou Z avant que le programme l'ait fixé.
@@ -145,7 +145,7 @@ Pour prendre une capture de la fenêtre sans l'ouvrir à la main, lancez-la avec
 
 ## 🧪 Tests
 
-La suite compte 301 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
+La suite compte 303 tests (`cargo test`, exécutés sous Windows et Linux dans le CI). Ils vérifient les cas normaux, les cas limites et les entrées abîmées : fichiers vides, bruit et fichiers coupés ne font jamais paniquer. Le CI exécute aussi `cargo fmt --check`, `cargo clippy` avec les avertissements comme erreurs et `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilation et publication
 

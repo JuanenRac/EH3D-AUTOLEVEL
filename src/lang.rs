@@ -150,6 +150,7 @@ pub enum Msg {
     MapOpened,
     Simulated,
     Computed,
+    RealtimeComment,
     NeedProgram,
     NeedMap,
     Truncated,
@@ -159,7 +160,7 @@ pub enum Msg {
 }
 
 impl Msg {
-    pub const ALL: [Msg; 68] = [
+    pub const ALL: [Msg; 69] = [
         Msg::Language,
         Msg::Fit,
         Msg::Cancel,
@@ -222,6 +223,7 @@ impl Msg {
         Msg::MapOpened,
         Msg::Simulated,
         Msg::Computed,
+        Msg::RealtimeComment,
         Msg::NeedProgram,
         Msg::NeedMap,
         Msg::Truncated,
@@ -852,6 +854,16 @@ impl Msg {
                 "{0} 件の移動を補正、{1} 個の分割を追加、Z のずれ {2} ～ {3} mm",
                 "已校正 {0} 次移动，新增 {1} 段，Z 偏移 {2} 至 {3} mm",
                 "{0} movimentos corrigidos, {1} troços acrescentados, Z deslocado de {2} a {3} mm",
+            ],
+            Msg::RealtimeComment => [
+                "{0} lines have a comment with a character GRBL obeys at once, the first is line {1} [realtime-character]",
+                "{0} líneas tienen un comentario con un carácter que GRBL obedece al instante, la primera es la línea {1} [realtime-character]",
+                "{0} Zeilen haben einen Kommentar mit einem Zeichen, das GRBL sofort ausführt, die erste ist Zeile {1} [realtime-character]",
+                "{0} lignes ont un commentaire avec un caractère que GRBL exécute aussitôt, la première est la ligne {1} [realtime-character]",
+                "{0} righe hanno un commento con un carattere che GRBL esegue subito, la prima è la riga {1} [realtime-character]",
+                "GRBL が即座に実行する文字を含むコメントがある行は {0} 行、最初は {1} 行目です [realtime-character]",
+                "有 {0} 行的注释含有 GRBL 会立即执行的字符，第一处在第 {1} 行 [realtime-character]",
+                "{0} linhas têm um comentário com um carácter que o GRBL obedece de imediato, a primeira é a linha {1} [realtime-character]",
             ],
             Msg::NeedProgram => [
                 "Open a G-code program first",

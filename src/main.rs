@@ -7,8 +7,8 @@ mod cli_args;
 use cli_args::{finish, flag, num, switch};
 use eh3d_autolevel::config;
 use eh3d_autolevel::gcode::{
-    a_axis_notice, b_axis_notice, correct, mark_with_header, outside_warning, report_json,
-    shift_warning, Options,
+    a_axis_notice, b_axis_notice, correct, mark_with_header, outside_warning, realtime_warning,
+    report_json, shift_warning, Options,
 };
 use eh3d_autolevel::server;
 use eh3d_autolevel::start;
@@ -383,6 +383,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 if let Some(w) = outside_warning(&r) {
                     eprintln!("warning: {w}");
                 }
+                if let Some(w) = realtime_warning(&r) {
+                    eprintln!("warning: {w}");
+                }
                 return Ok(());
             }
             // written beside and renamed, so that the output is never left half written
@@ -414,6 +417,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 eprintln!("warning: {w}");
             }
             if let Some(w) = outside_warning(&r) {
+                eprintln!("warning: {w}");
+            }
+            if let Some(w) = realtime_warning(&r) {
                 eprintln!("warning: {w}");
             }
             if let Some(link) = &link {

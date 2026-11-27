@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Built against the tag v0.1.4 of EH3D-CORE-LIBS** (the build and the binaries of a release took its main branch).
+- **A comment that GRBL would obey stops the stream and is warned about:** a line passed on as it was could hold `!`, `~`, `?` or a character outside ASCII in its comment, which GRBL obeys at once. `stream` stops before it (`realtime-character`), and `apply` and the window write the program and say how many lines have one and which is the first. 1 new test.
+- **The refusals name their code:** a word written twice or two codes of one group say `word-repeated`, and `G93` and `G95` say `feed-mode-unsupported`. 1 new test. Host-tested only.
 - **A line that was not read whole is refused:** a `*` that is not the checksum cut the rest of the line away, a word written twice or two codes of one group kept only the last one, a parameter line (`#1=5 G0 X100`) passed with its move uncorrected, and control characters reached the output. All of them stop the program with the number of the line. Host-tested only.
 
 - **A jog in a program is refused (fix):** a line that starts with `$` was passed through whatever it said, so a jog (`$J=`) or a homing (`$H`) reached the machine without being read. Only the commands that ask pass now (`$`, `$$`, `$#`, `$G`, `$I`, `$N`); every other one is refused with its line, also by `stream`. A line with a carriage return in the middle, which a controller reads as two, is refused too.

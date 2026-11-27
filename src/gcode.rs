@@ -18,6 +18,7 @@ use crate::arcs::{Arc, DEFAULT_ARC_TOLERANCE_MM, MAX_ARC_TOLERANCE_MM, MIN_ARC_T
 use crate::surface::{height, Method};
 use eh3d_levelling::HeightMap;
 use eh3d_parser_gcode::emit::{header, sha256_hex, Header};
+use eh3d_parser_gcode::{codes, parse, Dialect};
 
 /// What the turn of the axis A does to Z.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -161,6 +162,30 @@ pub struct Report {
     pub outside_max_mm: f64,
     /// How far, in mm, the reference point lies from the measured area (0 when it is inside).
     pub reference_outside_mm: f64,
+    /// How many lines go on to the controller with a comment that holds a character GRBL obeys at once.
+    pub realtime_lines: usize,
+    /// The number of the first of them in the program that was read (0 when there is none).
+    pub realtime_first_line: usize,
+}
+
+/// Whether the line has a comment with a character that GRBL obeys at once wherever it stands (`!`, `~`, `?` or one outside ASCII), as the G-code reader of the suite tells it.
+fn holds_realtime_comment(line: &str) -> bool {
+    parse(line, Dialect::Grbl)
+        .diagnostics
+        .iter()
+        .any(|d| d.code == codes::REALTIME_CHARACTER)
+}
+
+/// The warning for a program whose comments reach the controller with a character that GRBL obeys at once. `None` when there is none.
+pub fn realtime_warning(report: &Report) -> Option<String> {
+    (report.realtime_lines > 0).then(|| {
+        format!(
+            "{} lines have a comment with a character that GRBL obeys at once (!, ~, ? or one outside ASCII), the first is line {}: take it out before the program reaches a GRBL controller [{}]",
+            report.realtime_lines,
+            report.realtime_first_line,
+            codes::REALTIME_CHARACTER
+        )
+    })
 }
 
 /// The distance in mm from `(x, y)` to the measured area (0 inside).
@@ -355,7 +380,9 @@ fn is_one_expression(text: &str) -> bool {
 fn refuse_repeated(words: &[(char, f64)], n: usize) -> Result<(), String> {
     for (i, &(letter, _)) in words.iter().enumerate() {
         if !matches!(letter, 'G' | 'M') && words[..i].iter().any(|&(l, _)| l == letter) {
-            return Err(format!("line {n}: the word {letter} is written twice"));
+            return Err(format!(
+                "line {n}: the word {letter} is written twice [word-repeated]"
+            ));
         }
     }
     let count = |letter: char, group: &[f64]| {
@@ -366,7 +393,7 @@ fn refuse_repeated(words: &[(char, f64)], n: usize) -> Result<(), String> {
     };
     if count('G', &[0.0, 1.0, 2.0, 3.0]) > 1 || count('M', &[3.0, 4.0, 5.0]) > 1 {
         return Err(format!(
-            "line {n}: two codes of the same group on one line: a controller refuses it"
+            "line {n}: two codes of the same group on one line: a controller refuses it [word-repeated]"
         ));
     }
     Ok(())
@@ -671,6 +698,7 @@ impl<'a> Leveller<'a> {
         }
         // lines that are not moves and have no words to read: a `$` command of GRBL that only asks (`$G`), a parameter assignment (`#1=5`) and the text of a message (`M117 Hello`)
         if is_not_a_move(raw) {
+            self.note_realtime(n, raw);
             out.push_str(raw);
             out.push('\n');
             return Ok(());
@@ -719,6 +747,13 @@ impl<'a> Leveller<'a> {
                     ))
                 }
                 ('G', 20.0) => return Err(format!("line {n}: inches (G20) are not supported")),
+                ('G', v) if v == 93.0 || v == 95.0 => {
+                    return Err(format!(
+                        "line {n}: G{} is not supported: it changes what F means [{}]",
+                        fmt(v),
+                        codes::FEED_MODE_UNSUPPORTED
+                    ))
+                }
                 ('G', 2.0 | 3.0) if opts.arcs != ArcMode::Cut => {
                     return Err(format!(
                     "line {n}: arcs (G2, G3) are not supported: they cannot be cut in pieces here (arcs = cut in the settings file cuts them)"
@@ -771,6 +806,7 @@ impl<'a> Leveller<'a> {
                 }
             }
             self.mode = mode;
+            self.note_realtime(n, raw);
             out.push_str(raw);
             out.push('\n');
             return Ok(());
@@ -1011,6 +1047,16 @@ impl<'a> Leveller<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Counts a line that goes on as it is written, when its comment holds a character GRBL obeys at once.
+    fn note_realtime(&mut self, n: usize, raw: &str) {
+        if holds_realtime_comment(raw) {
+            if self.report.realtime_lines == 0 {
+                self.report.realtime_first_line = n;
+            }
+            self.report.realtime_lines += 1;
+        }
     }
 
     /// Writes down the correction of one piece in the report.
