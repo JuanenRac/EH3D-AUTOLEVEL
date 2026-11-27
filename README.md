@@ -17,7 +17,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 303 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
+**Honesty check - what actually runs today:** a Rust library and a command line program (`eh3d-autolevel`) with 304 tests that run on a computer: corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface. It has a window (built with `--features gui`) that opens a G-code program and a height map, shows the table as a coloured mesh with the levelled paths over it and exports, but the window has not been looked at on a screen yet; it has not been tried on a machine and it has not been checked against a collection of real files.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.4` |
 | Maturity | Functional |
-| Tests | 303 |
+| Tests | 304 |
 | Stack | Rust |
 | On real hardware | Not tried: nothing here has run on a machine |
 
@@ -46,7 +46,7 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Core | 🟡 | corrects the Z of a G-code program with the height map of the table, cutting the moves in pieces that follow the surface; tested on a computer with normal and damaged input, not with a collection of real files. |
 | Command line | 🟡 | `eh3d-autolevel` runs the same functions as the library and prints the result; every error comes back as a message and a non-zero exit code. |
-| Tests | 🟡 | 303 tests pass (`cargo test`), with normal cases, edge cases and damaged input. They include a seeded simulation of a probing session with the faults of the probe node with injected faults and recovery. |
+| Tests | 🟡 | 304 tests pass (`cargo test`), with normal cases, edge cases and damaged input. They include a seeded simulation of a probing session with the faults of the probe node with injected faults and recovery. |
 | Security | 🟡 | Plain safe Rust (`forbid(unsafe_code)`): nothing panics on the files it is given and a bad value is an error with its reason; no independent review. |
 | Window | 🟠 | Written (egui, `--features gui`): open or drop a program and a height map, simulate a table, see the table as a coloured mesh and the levelled paths, zoom and pan, set the levelling, export; its logic is tested, but it has not been built or looked at on a screen yet. |
 | Real hardware | 🔴 | Not tried: nothing here has been run on a machine. |
@@ -90,7 +90,7 @@ How the parts of this repository fit together: who uses it, what it holds and wh
 * **Tests with damaged input:** the tests also feed empty files, garbage, huge numbers and cut files, and none of them may panic.
 * **No guessing:** a value that does not make sense is an error that says which value and why, never a result that only looks right.
 * **No unsafe code:** `#![forbid(unsafe_code)]` in the library and the program.
-* **Lines that are not moves pass through:** the `$` commands of GRBL that only ask (`$`, `$$`, `$#`, `$G`, `$I`, `$N`), `#` assignments and the messages `M117` and `M118` are written as they are, the checksum of a numbered line is not a word, the spindle and coolant words (`M3` to `M9`) of a cut move go with its first piece and the ending words (`M0`, `M1`, `M2`, `M30`) with its last piece, and `--max-lines` (5000000 by default) refuses a program that would have more output lines. A jog (`$J=`), the homing (`$H`) and every other `$` command are refused with their line, as is a line with a carriage return in the middle; the output of `apply` and of `stream --out` is never the program or the map that are read. A line that passes as it is and whose comment holds `!`, `~`, `?` or a character outside ASCII, which GRBL obeys at once, stops `stream`; `apply` and the window write the program and warn with the first such line (`realtime-character`).
+* **Lines that are not moves pass through:** the `$` commands of GRBL that only ask (`$`, `$$`, `$#`, `$G`, `$I`, `$N`), `#` assignments and the messages `M117` and `M118` are written as they are, the checksum of a numbered line is not a word, the spindle and coolant words (`M3` to `M9`) of a cut move go with its first piece and the ending words (`M0`, `M1`, `M2`, `M30`) with its last piece, and `--max-lines` (5000000 by default) refuses a program that would have more output lines. A jog (`$J=`), the homing (`$H`) and every other `$` command are refused with their line, as is a line with a carriage return in the middle; the output of `apply` and of `stream --out` is never the program or the map that are read. A line that passes through and whose comment holds `!`, `~` or `?`, which GRBL obeys at once, stops `stream`; `apply` and the window write the program and warn with the first such line (`realtime-character`). Accented letters and other characters outside ASCII are allowed in a comment, and the lines that pass through carry them as `_`, because GRBL takes some of their bytes as commands; outside a comment such a character stops `stream`.
 * **The rotary axes A, B and C are interpolated:** when a cutting move is cut in pieces, its `A`, `B` and `C` words go in a straight line from the value they had to the one the move gives (they are modal and start at 0), with the same decimals as X, Y and Z, and the last piece ends exactly on the target; the Z of the table still comes from X and Y only. A program with no rotary words is written as before.
 * **Z compensation for the turn of the axis A:** with `a-axis-compensation = tilt` and `a-axis-radius-mm = r` (or `--a-compensation tilt --a-radius r`), every written move gets `r * (1 - cos A)` added to its Z after the height of the table, with A in degrees as the move leaves it (interpolated piece by piece); it is `off` by default, which changes no output, and a notice on the error output says when it was applied. The formula is in `docs/a-axis-compensation.md`.
 * **The axes B and C:** the axis B (a turn about Y) has the same compensation with its own radius (`b-axis-compensation = tilt` and `b-axis-radius-mm` in the file, `--b-compensation` and `--b-radius`) and the two add up; the axis C turns about Z, changes no height and needs none (its words are carried and interpolated like A and B). A simulated machine walks the levelled program and checks the depth below the table; nothing has run on a machine with rotary axes. **A move that leaves out an axis:** by default the program is taken to start at 0 on every axis; `unknown-axis = refuse` (`--unknown-axis refuse`) refuses, with the number of the line, a move that leaves out X, Y or Z before the program has set it.
@@ -145,7 +145,7 @@ To take a picture of the window without opening it by hand, run it with `--shot 
 
 ## 🧪 Testing
 
-The suite has 303 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
+The suite has 304 tests (`cargo test`, run on Windows and Linux in the CI). They check the normal cases, the edge cases and damaged input: empty files, garbage and cut files never panic. The CI also runs `cargo fmt --check`, `cargo clippy` with warnings as errors and `python -I tools/ci_validate.py`.
 
 ## 🏗️ Build & Release
 

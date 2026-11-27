@@ -17,7 +17,7 @@
 
 ---
 
-**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 303 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
+**Comprobación de honestidad - lo que funciona hoy:** una biblioteca Rust y un programa de línea de comandos (`eh3d-autolevel`) con 304 pruebas que se ejecutan en un ordenador: corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie. Tiene una ventana (se compila con `--features gui`) que abre un programa G-code y un mapa de alturas, muestra la mesa como una malla coloreada con las trayectorias niveladas encima y exporta, pero todavía no se ha visto en una pantalla; no se ha probado en una máquina y no se ha comprobado con una colección de ficheros reales.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.1.4` |
 | Madurez | Funcional |
-| Pruebas | 303 |
+| Pruebas | 304 |
 | Pila tecnológica | Rust |
 | En hardware real | No probado: nada de esto se ha ejecutado en una máquina |
 
@@ -46,7 +46,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 |---|---|---|
 | Núcleo | 🟡 | corrige la Z de un programa G-code con el mapa de alturas de la mesa, partiendo los movimientos en trozos que siguen la superficie; probado en un ordenador con entradas normales y dañadas, no con una colección de ficheros reales. |
 | Línea de comandos | 🟡 | `eh3d-autolevel` ejecuta las mismas funciones que la biblioteca e imprime el resultado; cada error vuelve como mensaje y un código de salida distinto de cero. |
-| Pruebas | 🟡 | 303 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. Incluyen una simulación con semilla fija de una sesión de palpado con los fallos del nodo palpador, con fallos inyectados y recuperación. |
+| Pruebas | 🟡 | 304 pruebas pasan (`cargo test`), con casos normales, casos límite y entradas dañadas. Incluyen una simulación con semilla fija de una sesión de palpado con los fallos del nodo palpador, con fallos inyectados y recuperación. |
 | Seguridad | 🟡 | Rust seguro y simple (`forbid(unsafe_code)`): nada entra en pánico con los ficheros recibidos y un valor malo es un error con su motivo; sin revisión independiente. |
 | Ventana | 🟠 | Escrita (egui, `--features gui`): abrir o soltar un programa y un mapa de alturas, simular una mesa, ver la mesa como malla coloreada y las trayectorias niveladas, zoom y desplazamiento, ajustar la nivelación, exportar; su lógica está probada, pero todavía no se ha compilado ni visto en una pantalla. |
 | Hardware real | 🔴 | No probado: nada de esto se ha ejecutado en una máquina. |
@@ -90,7 +90,7 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 * **Pruebas con entradas dañadas:** las pruebas también dan ficheros vacíos, basura, números enormes y ficheros cortados, y ninguna puede provocar un pánico.
 * **Sin adivinar:** un valor que no tiene sentido es un error que dice cuál y por qué, nunca un resultado que solo lo parece.
 * **Sin código unsafe:** `#![forbid(unsafe_code)]` en la biblioteca y el programa.
-* **Las líneas que no son movimientos pasan tal cual:** los comandos `$`, las asignaciones `#` y los mensajes `M117` y `M118` se escriben como están, la suma de comprobación de una línea numerada no es una palabra, las palabras de husillo y refrigerante (`M3` a `M9`) de un movimiento cortado van con su primera pieza y las de fin (`M0`, `M1`, `M2`, `M30`) con la última, `--max-lines` (5000000 por defecto) rechaza un programa con más líneas de salida. Un movimiento manual (`$J=`), la búsqueda de origen (`$H`) y cualquier otra orden `$` que no sea de consulta (`$`, `$$`, `$#`, `$G`, `$I`, `$N`) se rechazan con su línea, igual que una línea con un retorno de carro en medio; la salida de `apply` y de `stream --out` nunca es el programa ni el mapa que se leen. Una línea que pasa tal cual y cuyo comentario lleva `!`, `~`, `?` o un carácter fuera de ASCII, que GRBL obedece al instante, detiene `stream`; `apply` y la ventana escriben el programa y avisan con la primera línea así (`realtime-character`).
+* **Las líneas que no son movimientos pasan tal cual:** los comandos `$`, las asignaciones `#` y los mensajes `M117` y `M118` se escriben como están, la suma de comprobación de una línea numerada no es una palabra, las palabras de husillo y refrigerante (`M3` a `M9`) de un movimiento cortado van con su primera pieza y las de fin (`M0`, `M1`, `M2`, `M30`) con la última, `--max-lines` (5000000 por defecto) rechaza un programa con más líneas de salida. Un movimiento manual (`$J=`), la búsqueda de origen (`$H`) y cualquier otra orden `$` que no sea de consulta (`$`, `$$`, `$#`, `$G`, `$I`, `$N`) se rechazan con su línea, igual que una línea con un retorno de carro en medio; la salida de `apply` y de `stream --out` nunca es el programa ni el mapa que se leen. Una línea que pasa y cuyo comentario lleva `!`, `~` o `?`, que GRBL obedece al instante, detiene `stream`; `apply` y la ventana escriben el programa y avisan con la primera línea así (`realtime-character`). Las letras acentuadas y los demás caracteres fuera de ASCII se admiten en un comentario y las líneas que pasan los llevan como `_`, porque GRBL toma algunos de sus bytes como órdenes; fuera de un comentario, un carácter así detiene `stream`.
 * **Los ejes rotativos A, B y C se interpolan:** cuando un movimiento de corte se parte en piezas, sus palabras `A`, `B` y `C` van en línea recta del valor que tenían al que da el movimiento (son modales y empiezan en 0), con los mismos decimales que X, Y y Z, y la última pieza acaba exactamente en el destino; la Z de la mesa sigue saliendo solo de X e Y. Un programa sin palabras rotativas se escribe como antes.
 * **Compensación de Z por el giro del eje A:** con `a-axis-compensation = tilt` y `a-axis-radius-mm = r` (o `--a-compensation tilt --a-radius r`), a la Z de cada movimiento escrito se le suma `r * (1 - cos A)` después de la altura de la mesa, con A en grados tal como la deja el movimiento (interpolada pieza a pieza); por defecto es `off`, que no cambia ninguna salida, y un aviso por la salida de errores dice cuándo se aplicó. La fórmula está en `docs/a-axis-compensation.md`.
 * **Los ejes B y C:** el eje B (un giro sobre Y) tiene la misma compensación con su propio radio (`b-axis-compensation = tilt` y `b-axis-radius-mm` en el fichero, `--b-compensation` y `--b-radius`) y las dos se suman; el eje C gira sobre Z, no cambia ninguna altura y no necesita ninguna (sus palabras se llevan e interpolan como las de A y B). Una máquina simulada recorre el programa nivelado y comprueba la profundidad bajo la mesa; nada se ha ejecutado en una máquina con ejes rotativos. **Un movimiento que omite un eje:** por defecto se toma que el programa empieza en 0 en cada eje; `unknown-axis = refuse` (`--unknown-axis refuse`) rechaza, con el número de la línea, un movimiento que omite X, Y o Z antes de que el programa lo haya fijado.
@@ -145,7 +145,7 @@ Para sacar una captura de la ventana sin abrirla a mano, ejecútelo con `--shot 
 
 ## 🧪 Pruebas
 
-El conjunto tiene 303 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
+El conjunto tiene 304 pruebas (`cargo test`, ejecutadas en Windows y Linux en el CI). Comprueban los casos normales, los casos límite y las entradas dañadas: ficheros vacíos, basura y ficheros cortados nunca provocan un pánico. El CI ejecuta además `cargo fmt --check`, `cargo clippy` con las advertencias como errores y `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilación y publicación
 

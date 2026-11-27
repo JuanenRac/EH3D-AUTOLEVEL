@@ -17,7 +17,7 @@
 
 ---
 
-**Ehrlichkeitscheck - was heute wirklich läuft:** eine Rust-Bibliothek und ein Kommandozeilenprogramm (`eh3d-autolevel`) mit 303 Tests, die auf einem Computer laufen: korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen. Es hat ein Fenster (Build mit `--features gui`), das ein G-Code-Programm und eine Höhenkarte öffnet, den Tisch als farbiges Netz mit den nivellierten Bahnen darüber zeigt und exportiert, aber das Fenster wurde noch nicht auf einem Bildschirm angesehen; wurde an keiner Maschine ausprobiert und nicht an einer Sammlung echter Dateien geprüft.
+**Ehrlichkeitscheck - was heute wirklich läuft:** eine Rust-Bibliothek und ein Kommandozeilenprogramm (`eh3d-autolevel`) mit 304 Tests, die auf einem Computer laufen: korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen. Es hat ein Fenster (Build mit `--features gui`), das ein G-Code-Programm und eine Höhenkarte öffnet, den Tisch als farbiges Netz mit den nivellierten Bahnen darüber zeigt und exportiert, aber das Fenster wurde noch nicht auf einem Bildschirm angesehen; wurde an keiner Maschine ausprobiert und nicht an einer Sammlung echter Dateien geprüft.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.4` |
 | Reifegrad | Funktionsfähig |
-| Tests | 303 |
+| Tests | 304 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nicht erprobt: nichts davon lief an einer Maschine |
 
@@ -46,7 +46,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 |---|---|---|
 | Kern | 🟡 | korrigiert das Z eines G-Code-Programms mit der Höhenkarte des Tisches und schneidet die Bewegungen in Stücke, die der Oberfläche folgen; am Computer mit normalen und beschädigten Eingaben getestet, nicht mit einer Sammlung echter Dateien. |
 | Kommandozeile | 🟡 | `eh3d-autolevel` führt dieselben Funktionen wie die Bibliothek aus und gibt das Ergebnis aus; jeder Fehler kommt als Meldung mit einem Exit-Code ungleich null zurück. |
-| Tests | 🟡 | 303 Tests bestehen (`cargo test`), mit Normalfällen, Grenzfällen und beschädigten Eingaben. Dazu gehört eine Simulation mit festem Seed für eine Antastsitzung mit den Fehlern des Tastknotens, mit eingespeisten Fehlern und Wiederherstellung. |
+| Tests | 🟡 | 304 Tests bestehen (`cargo test`), mit Normalfällen, Grenzfällen und beschädigten Eingaben. Dazu gehört eine Simulation mit festem Seed für eine Antastsitzung mit den Fehlern des Tastknotens, mit eingespeisten Fehlern und Wiederherstellung. |
 | Sicherheit | 🟡 | Reines sicheres Rust (`forbid(unsafe_code)`): nichts gerät bei den übergebenen Dateien in Panik und ein schlechter Wert ist ein Fehler mit Begründung; keine unabhängige Prüfung. |
 | Fenster | 🟠 | Geschrieben (egui, `--features gui`): Programm und Höhenkarte öffnen oder hineinziehen, einen Tisch simulieren, den Tisch als farbiges Netz und die nivellierten Bahnen sehen, Zoom und Verschieben, die Nivellierung einstellen, exportieren; die Logik ist getestet, aber noch nicht gebaut oder auf einem Bildschirm angesehen. |
 | Echte Hardware | 🔴 | Nicht erprobt: nichts davon wurde an einer Maschine ausgeführt. |
@@ -90,7 +90,7 @@ Wie die Teile dieses Repositorys zusammenpassen: wer es nutzt, was es enthält u
 * **Tests mit beschädigten Eingaben:** Die Tests füttern auch leere Dateien, Datenmüll, riesige Zahlen und abgeschnittene Dateien; keiner darf in Panik geraten.
 * **Kein Raten:** Ein unsinniger Wert ist ein Fehler, der sagt welcher und warum, nie ein Ergebnis, das nur richtig aussieht.
 * **Kein unsafe-Code:** `#![forbid(unsafe_code)]` in Bibliothek und Programm.
-* **Zeilen, die keine Bewegungen sind, werden durchgereicht:** `$`-Befehle, `#`-Zuweisungen und die Meldungen `M117` und `M118` bleiben unverändert, die Prüfsumme einer nummerierten Zeile ist kein Wort, die Spindel- und Kühlmittelwörter (`M3` bis `M9`) einer zerlegten Bewegung gehören zum ersten Stück und die Endwörter (`M0`, `M1`, `M2`, `M30`) zum letzten, und `--max-lines` (standardmäßig 5000000) lehnt ein Programm mit mehr Ausgabezeilen ab. Ein Jog-Befehl (`$J=`), die Referenzfahrt (`$H`) und jeder andere `$`-Befehl, der nicht nur abfragt (`$`, `$$`, `$#`, `$G`, `$I`, `$N`), werden mit ihrer Zeile abgelehnt, ebenso eine Zeile mit einem Wagenrücklauf in der Mitte; die Ausgabe von `apply` und `stream --out` ist nie das gelesene Programm oder die gelesene Karte. Eine unverändert durchgereichte Zeile, deren Kommentar `!`, `~`, `?` oder ein Zeichen außerhalb von ASCII enthält, das GRBL sofort ausführt, stoppt `stream`; `apply` und das Fenster schreiben das Programm und warnen mit der ersten solchen Zeile (`realtime-character`).
+* **Zeilen, die keine Bewegungen sind, werden durchgereicht:** `$`-Befehle, `#`-Zuweisungen und die Meldungen `M117` und `M118` bleiben unverändert, die Prüfsumme einer nummerierten Zeile ist kein Wort, die Spindel- und Kühlmittelwörter (`M3` bis `M9`) einer zerlegten Bewegung gehören zum ersten Stück und die Endwörter (`M0`, `M1`, `M2`, `M30`) zum letzten, und `--max-lines` (standardmäßig 5000000) lehnt ein Programm mit mehr Ausgabezeilen ab. Ein Jog-Befehl (`$J=`), die Referenzfahrt (`$H`) und jeder andere `$`-Befehl, der nicht nur abfragt (`$`, `$$`, `$#`, `$G`, `$I`, `$N`), werden mit ihrer Zeile abgelehnt, ebenso eine Zeile mit einem Wagenrücklauf in der Mitte; die Ausgabe von `apply` und `stream --out` ist nie das gelesene Programm oder die gelesene Karte. Eine durchgereichte Zeile, deren Kommentar `!`, `~` oder `?` enthält, die GRBL sofort ausführt, stoppt `stream`; `apply` und das Fenster schreiben das Programm und warnen mit der ersten solchen Zeile (`realtime-character`). Buchstaben mit Akzent und andere Zeichen außerhalb von ASCII sind in einem Kommentar erlaubt und werden in den durchgereichten Zeilen als `_` geschrieben, weil GRBL einige ihrer Bytes als Befehle nimmt; außerhalb eines Kommentars stoppt ein solches Zeichen `stream`.
 * **Die Drehachsen A, B und C werden interpoliert:** wird eine Schneidbewegung in Stücke zerlegt, laufen ihre Wörter `A`, `B` und `C` geradlinig vom bisherigen Wert zu dem der Bewegung (sie sind modal und beginnen bei 0), mit denselben Dezimalstellen wie X, Y und Z; das letzte Stück endet genau auf dem Ziel, und das Z des Tisches kommt weiterhin nur aus X und Y. Ein Programm ohne Drehwörter wird wie bisher geschrieben.
 * **Z-Kompensation für die Drehung der Achse A:** Mit `a-axis-compensation = tilt` und `a-axis-radius-mm = r` (oder `--a-compensation tilt --a-radius r`) wird zum Z jeder geschriebenen Bewegung nach der Höhe des Tisches `r * (1 - cos A)` addiert, mit A in Grad, wie die Bewegung sie hinterlässt (Stück für Stück interpoliert); Standard ist `off`, das keine Ausgabe verändert, und ein Hinweis auf der Fehlerausgabe sagt, wann sie angewendet wurde. Die Formel steht in `docs/a-axis-compensation.md`.
 * **Die Achsen B und C:** Die Achse B (eine Drehung um Y) hat dieselbe Kompensation mit eigenem Radius (`b-axis-compensation = tilt` und `b-axis-radius-mm` in der Datei, `--b-compensation` und `--b-radius`), und beide addieren sich; die Achse C dreht um Z, ändert keine Höhe und braucht keine (ihre Wörter werden wie die von A und B mitgeführt und interpoliert). Eine simulierte Maschine geht das nivellierte Programm durch und prüft die Tiefe unter dem Tisch; auf einer Maschine mit Drehachsen lief nichts. **Ein Zug, der eine Achse auslässt:** standardmäßig gilt das Programm als bei 0 auf jeder Achse gestartet; `unknown-axis = refuse` (`--unknown-axis refuse`) lehnt mit der Zeilennummer einen Zug ab, der X, Y oder Z auslässt, bevor das Programm sie gesetzt hat.
@@ -145,7 +145,7 @@ Um ein Bild des Fensters aufzunehmen, ohne es von Hand zu öffnen, starten Sie e
 
 ## 🧪 Tests
 
-Die Suite hat 303 Tests (`cargo test`, in der CI unter Windows und Linux). Sie prüfen Normalfälle, Grenzfälle und beschädigte Eingaben: leere Dateien, Datenmüll und abgeschnittene Dateien lösen nie eine Panik aus. Die CI führt außerdem `cargo fmt --check`, `cargo clippy` mit Warnungen als Fehlern und `python -I tools/ci_validate.py` aus.
+Die Suite hat 304 Tests (`cargo test`, in der CI unter Windows und Linux). Sie prüfen Normalfälle, Grenzfälle und beschädigte Eingaben: leere Dateien, Datenmüll und abgeschnittene Dateien lösen nie eine Panik aus. Die CI führt außerdem `cargo fmt --check`, `cargo clippy` mit Warnungen als Fehlern und `python -I tools/ci_validate.py` aus.
 
 ## 🏗️ Build und Veröffentlichung
 

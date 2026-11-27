@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Accents in a comment no longer stop the stream and never reach the controller:** `stream` stops and `apply` warns only for `!`, `~`, `?` and control characters in a comment. The lines that pass through carry the characters outside ASCII of their comments as `_`, because GRBL takes some of their bytes as commands; outside a comment such a character stops `stream`. 1 new test. Host-tested only.
+
 ## [0.1.4] - Real-time characters stop the stream and the input files are never written over (not tried on a machine)
 
 - **Built against the tag v0.1.4 of EH3D-CORE-LIBS** (the build and the binaries of a release took its main branch).

@@ -6,7 +6,8 @@
 //! * goes outside the measured area by more than `stream-outside-mm` (the height there is a guess),
 //! * would take the tool below `stream-min-z-mm`,
 //! * gets a correction of Z beyond `stream-max-shift-mm` (a map that is wrong, or a probe that slipped),
-//! * has a comment with a character that GRBL obeys at once (`!`, `~`, `?` or one outside ASCII), or
+//! * has a comment with a character that GRBL obeys at once (`!`, `~`, `?` or a control character),
+//! * holds a character outside ASCII outside its comments (in a comment it is sent as `_`), or
 //! * cannot be levelled at all (an arc when arcs are refused, a code that moves the origin, a program that is levelled already).
 //!
 //! A stopped stream stays stopped. [`Streamer::safe_lines`] is what a sender should do next: the spindle off and a lift to `stream-safe-z-mm` (plus the correction of the place, and never lower
@@ -105,7 +106,7 @@ impl fmt::Display for Halt {
             ),
             HaltReason::RealtimeCharacter => write!(
                 f,
-                "line {n}: a comment holds a character that GRBL obeys at once (!, ~, ? or one outside ASCII): the line is not sent [realtime-character]"
+                "line {n}: a comment holds a character that GRBL obeys at once (!, ~, ? or a control character): the line is not sent [realtime-character]"
             ),
         }
     }
@@ -205,6 +206,15 @@ impl<'a> Streamer<'a> {
             return stop(self, HaltReason::ShiftTooLarge { shift_mm: worst });
         }
         let lines: Vec<String> = out.lines().map(str::to_string).collect();
+        // the comments have been cleaned: what is left outside ASCII is not in one, and GRBL may obey a byte of it
+        if lines.iter().any(|l| !l.is_ascii()) {
+            return stop(
+                self,
+                HaltReason::Refused(format!(
+                    "line {n}: a character outside ASCII outside a comment: the line is not sent [character-ignored]"
+                )),
+            );
+        }
         let mut last_z = None;
         for l in &lines {
             let z = words(l, n)
