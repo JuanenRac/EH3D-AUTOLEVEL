@@ -1,6 +1,7 @@
 //! More tests: the mark of a levelled program, the bicubic surface at the edges and on a plane, and the methods side by side.
 
-use eh3d_autolevel::gcode::{correct, levelled_line, mark, Options, MARK};
+use eh3d_autolevel::gcode::{correct, levelled_line, mark, realtime_warning, Options, MARK};
+use eh3d_autolevel::stream::{HaltReason, StreamLimits, Streamer};
 use eh3d_autolevel::surface::{bicubic, height, Method};
 use eh3d_levelling::{Grid, HeightMap};
 
@@ -286,4 +287,49 @@ fn a_program_with_too_many_output_lines_is_refused_before_the_pieces_are_made() 
         ..Options::default()
     };
     assert!(correct("G0 X0 Y0\nG1 X50 F200\n", &plane(0.001, 0.0), &fits).is_ok());
+}
+
+#[test]
+fn a_comment_grbl_would_obey_is_warned_about_and_stops_the_stream() {
+    let map = plane(0.0, 0.0);
+    let o = Options::default();
+    let program = "G90 G21\nG0 X1 Y1 Z5\n(go!)\nM3 S100 ; \u{f1}\nG1 Z-1 F100 (ok?)\n";
+    let (out, report) = correct(program, &map, &o).unwrap();
+    // the comment of a move is not written again; the two lines that pass as they are do keep theirs
+    assert_eq!(
+        (report.realtime_lines, report.realtime_first_line),
+        (2, 3),
+        "{out}"
+    );
+    let warning = realtime_warning(&report).unwrap();
+    assert!(
+        warning.contains("line 3") && warning.contains("[realtime-character]"),
+        "{warning}"
+    );
+    let mut stream = Streamer::new(&map, &o, StreamLimits::default()).unwrap();
+    stream.line("G90 G21").unwrap();
+    stream.line("G0 X1 Y1 Z5").unwrap();
+    let halt = stream.line("(go!)").unwrap_err();
+    assert_eq!(halt.reason, HaltReason::RealtimeCharacter);
+    assert_eq!((halt.line, halt.reason.code()), (3, "realtime-character"));
+    assert!(stream.line("G0 X2").is_err());
+    // a clean program has no warning
+    let (_, clean) = correct("G90 G21\nG0 X1 Y1 Z5 (go)\n(fine)\n", &map, &o).unwrap();
+    assert!(realtime_warning(&clean).is_none());
+}
+
+#[test]
+fn the_refusals_that_the_reader_of_the_suite_names_carry_its_codes() {
+    let map = plane(0.0, 0.0);
+    let o = Options::default();
+    for (line, code) in [
+        ("G93 G1 X2 F1", "[feed-mode-unsupported]"),
+        ("G95", "[feed-mode-unsupported]"),
+        ("G1 X2 X3", "[word-repeated]"),
+        ("M3 M5", "[word-repeated]"),
+    ] {
+        let program = format!("G90 G21\nG1 X1 Y1 Z1 F100\n{line}\n");
+        let e = correct(&program, &map, &o).unwrap_err();
+        assert!(e.starts_with("line 3:") && e.contains(code), "{line}: {e}");
+    }
 }

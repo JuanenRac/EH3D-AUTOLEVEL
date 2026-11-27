@@ -17,11 +17,11 @@ version = "0.0.1"
 
 [[package]]
 name = "eh3d-parser-common"
-version = "0.0.7"
+version = "0.1.4"
 
 [[package]]
 name = "eh3d-parser-gcode"
-version = "0.0.7"
+version = "0.1.4"
 dependencies = [
  "eh3d-parser-common",
 ]

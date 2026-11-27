@@ -5,7 +5,8 @@
 //! Between the program and the machine it keeps a safe state. The stream STOPS, and nothing more is given out (not even the line that broke the rule), when a line
 //! * goes outside the measured area by more than `stream-outside-mm` (the height there is a guess),
 //! * would take the tool below `stream-min-z-mm`,
-//! * gets a correction of Z beyond `stream-max-shift-mm` (a map that is wrong, or a probe that slipped), or
+//! * gets a correction of Z beyond `stream-max-shift-mm` (a map that is wrong, or a probe that slipped),
+//! * has a comment with a character that GRBL obeys at once (`!`, `~`, `?` or one outside ASCII), or
 //! * cannot be levelled at all (an arc when arcs are refused, a code that moves the origin, a program that is levelled already).
 //!
 //! A stopped stream stays stopped. [`Streamer::safe_lines`] is what a sender should do next: the spindle off and a lift to `stream-safe-z-mm` (plus the correction of the place, and never lower
@@ -56,6 +57,8 @@ pub enum HaltReason {
     Refused(String),
     /// The program carries the mark of a levelled one.
     AlreadyLevelled,
+    /// A comment of the line holds a character that GRBL obeys at once.
+    RealtimeCharacter,
 }
 
 impl HaltReason {
@@ -67,6 +70,7 @@ impl HaltReason {
             HaltReason::ShiftTooLarge { .. } => "shift-too-large",
             HaltReason::Refused(_) => "refused",
             HaltReason::AlreadyLevelled => "already-levelled",
+            HaltReason::RealtimeCharacter => "realtime-character",
         }
     }
 }
@@ -98,6 +102,10 @@ impl fmt::Display for Halt {
             HaltReason::AlreadyLevelled => write!(
                 f,
                 "line {n}: this program was already levelled by eh3d-autolevel; send the original program"
+            ),
+            HaltReason::RealtimeCharacter => write!(
+                f,
+                "line {n}: a comment holds a character that GRBL obeys at once (!, ~, ? or one outside ASCII): the line is not sent [realtime-character]"
             ),
         }
     }
@@ -174,6 +182,9 @@ impl<'a> Streamer<'a> {
             return stop(self, HaltReason::Refused(e));
         }
         let report = self.leveller.report();
+        if report.realtime_lines > 0 {
+            return stop(self, HaltReason::RealtimeCharacter);
+        }
         let lim = self.limits;
         if report.outside_max_mm > lim.outside_mm {
             return stop(

@@ -6,7 +6,7 @@ EH3D-AUTOLEVEL is a working program on a computer: a library (`eh3d_autolevel`),
 
 ## Capabilities
 
-The official state of each capability is in `REQUIREMENTS.md`. The register has 56 requirements: 48 implemented, 6 prototype, 2 planned and 0 validated. By progress: 48 done, 6 partial, 0 pending and 2 blocked. This page never states a state that `REQUIREMENTS.md` does not.
+The official state of each capability is in `REQUIREMENTS.md`. The register has 57 requirements: 49 implemented, 6 prototype, 2 planned and 0 validated. By progress: 49 done, 6 partial, 0 pending and 2 blocked. This page never states a state that `REQUIREMENTS.md` does not.
 
 ## Open questions
 
