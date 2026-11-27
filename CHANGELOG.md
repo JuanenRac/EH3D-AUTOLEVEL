@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.4] - Real-time characters stop the stream and the input files are never written over (not tried on a machine)
+
 - **Built against the tag v0.1.4 of EH3D-CORE-LIBS** (the build and the binaries of a release took its main branch).
 - **A comment that GRBL would obey stops the stream and is warned about:** a line passed on as it was could hold `!`, `~`, `?` or a character outside ASCII in its comment, which GRBL obeys at once. `stream` stops before it (`realtime-character`), and `apply` and the window write the program and say how many lines have one and which is the first. 1 new test.
 - **The refusals name their code:** a word written twice or two codes of one group say `word-repeated`, and `G93` and `G95` say `feed-mode-unsupported`. 1 new test. Host-tested only.
