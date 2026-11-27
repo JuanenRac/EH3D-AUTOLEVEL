@@ -392,14 +392,26 @@ fn random_programs_with_arcs_are_cut_or_refused_without_a_panic() {
     let map = table(0.001, 0.002);
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
     let (mut cut, mut refused) = (0, 0);
-    for round in 0..600 {
+    for round in 0..1500 {
         let mut text = String::from("G0 X10 Y0 Z0\n");
         for _ in 0..1 + rng.below(8) {
-            for k in 0..1 + rng.below(6) {
-                if k > 0 {
+            // a word twice and two motion codes on a line are refused, so a line here has one of each
+            let mut used = Vec::new();
+            for _ in 0..1 + rng.below(6) {
+                let word = WORDS[rng.below(WORDS.len())];
+                let kind = match word {
+                    "G0" | "G1" | "G2" | "G3" => 'g',
+                    "G90.1" | "G91.1" | "(note)" => '-',
+                    _ => word.chars().next().unwrap_or('-'),
+                };
+                if kind != '-' && used.contains(&kind) {
+                    continue;
+                }
+                used.push(kind);
+                if used.len() > 1 {
                     text.push(' ');
                 }
-                text.push_str(WORDS[rng.below(WORDS.len())]);
+                text.push_str(word);
             }
             text.push('\n');
         }
