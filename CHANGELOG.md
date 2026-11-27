@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-- **A line that was not read whole is refused:** a `*` that is not the checksum cut the rest of the line away, a word written twice or two codes of one group kept only the last one, a comment with a bracket inside it hid words that the controller reads, a parameter line (`#1=5 G0 X100`) passed with its move uncorrected, and control characters reached the output. All of them stop the program with the number of the line. Host-tested only.
+- **A line that was not read whole is refused:** a `*` that is not the checksum cut the rest of the line away, a word written twice or two codes of one group kept only the last one, a parameter line (`#1=5 G0 X100`) passed with its move uncorrected, and control characters reached the output. All of them stop the program with the number of the line. Host-tested only.
 
 - **A jog in a program is refused (fix):** a line that starts with `$` was passed through whatever it said, so a jog (`$J=`) or a homing (`$H`) reached the machine without being read. Only the commands that ask pass now (`$`, `$$`, `$#`, `$G`, `$I`, `$N`); every other one is refused with its line, also by `stream`. A line with a carriage return in the middle, which a controller reads as two, is refused too.
 - **The program that is read is never written over (fix):** `apply OUT.nc` and `stream --out` refuse an output that is the input program or the map, and so does the export of the window. Levelling a file in place is not possible any more: write to another file. Three new tests.

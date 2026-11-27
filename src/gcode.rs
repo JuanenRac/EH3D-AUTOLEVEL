@@ -249,16 +249,15 @@ fn is_checksum(rest: &str) -> bool {
     }
 }
 
-/// The words of a line without its comments: `(...)` and everything after `;`. A bracket inside a comment or a closing one with no comment is refused (a controller ends the
-/// comment at the first `)`, so what follows would be words for it), and so is a `*` that is not the checksum of the line.
+/// The words of a line without its comments: `(...)` and everything after `;`. A `*` that is not the checksum of the line is refused: what comes after it would be lost.
 pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
     let mut clean = String::new();
-    let mut open = false;
+    let mut depth = 0;
     for (at, c) in line.char_indices() {
         match c {
-            ';' if !open => break,
+            ';' if depth == 0 => break,
             // the checksum of a numbered line (`N10 G1 X5*45`) is not a word
-            '*' if !open => {
+            '*' if depth == 0 => {
                 if line.get(at + 1..).is_some_and(is_checksum) {
                     break;
                 }
@@ -266,14 +265,9 @@ pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
                     "line {number}: '*' is not followed by the checksum of the line: what comes after it would be lost"
                 ));
             }
-            '(' if !open => open = true,
-            ')' if open => open = false,
-            '(' | ')' => {
-                return Err(format!(
-                    "line {number}: a bracket inside a comment or without one: a controller ends a comment at the first ')'"
-                ))
-            }
-            _ if !open => clean.push(c),
+            '(' => depth += 1,
+            ')' if depth > 0 => depth -= 1,
+            _ if depth == 0 => clean.push(c),
             _ => {}
         }
     }

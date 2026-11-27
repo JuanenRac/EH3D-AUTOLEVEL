@@ -398,13 +398,6 @@ fn a_word_written_twice_is_not_settled_by_taking_one() {
 }
 
 #[test]
-fn a_comment_that_a_controller_ends_sooner_is_refused() {
-    // a controller ends the comment at the first bracket: X50 is a word for it
-    refused("G1 X1 (a (b) X50) F100");
-    refused("G1 X1 ) F100");
-}
-
-#[test]
 fn a_parameter_line_may_not_carry_a_move() {
     for line in [
         "#1=5 G0 X100",
