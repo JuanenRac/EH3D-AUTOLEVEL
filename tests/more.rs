@@ -295,10 +295,10 @@ fn a_comment_grbl_would_obey_is_warned_about_and_stops_the_stream() {
     let o = Options::default();
     let program = "G90 G21\nG0 X1 Y1 Z5\n(go!)\nM3 S100 ; \u{f1}\nG1 Z-1 F100 (ok?)\n";
     let (out, report) = correct(program, &map, &o).unwrap();
-    // the comment of a move is not written again; the two lines that pass as they are do keep theirs
+    // the comment of a move is not written again; the lines that pass keep theirs, and an accent in one is no command
     assert_eq!(
         (report.realtime_lines, report.realtime_first_line),
-        (2, 3),
+        (1, 3),
         "{out}"
     );
     let warning = realtime_warning(&report).unwrap();
@@ -316,6 +316,25 @@ fn a_comment_grbl_would_obey_is_warned_about_and_stops_the_stream() {
     // a clean program has no warning
     let (_, clean) = correct("G90 G21\nG0 X1 Y1 Z5 (go)\n(fine)\n", &map, &o).unwrap();
     assert!(realtime_warning(&clean).is_none());
+}
+
+#[test]
+fn accents_in_a_comment_go_on_as_underscores_and_outside_a_comment_stop_the_stream() {
+    let map = plane(0.0, 0.0);
+    let o = Options::default();
+    let program = "G90 G21\n(fabricaci\u{f3}n \u{c4})\nM3 S100 ; a\u{f1}o\n";
+    let (out, report) = correct(program, &map, &o).unwrap();
+    assert!(out.is_ascii(), "{out}");
+    assert!(
+        out.contains("(fabricaci_n _)") && out.contains("M3 S100 ; a_o"),
+        "{out}"
+    );
+    assert!(realtime_warning(&report).is_none(), "{report:?}");
+    let mut stream = Streamer::new(&map, &o, StreamLimits::default()).unwrap();
+    assert_eq!(stream.line("(dise\u{f1}o)").unwrap(), ["(dise_o)"]);
+    // a message is not a comment: what it says would reach the controller as it is
+    let halt = stream.line("M117 a\u{f1}o").unwrap_err();
+    assert!(matches!(halt.reason, HaltReason::Refused(_)), "{halt}");
 }
 
 #[test]

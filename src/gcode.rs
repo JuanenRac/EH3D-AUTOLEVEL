@@ -168,19 +168,44 @@ pub struct Report {
     pub realtime_first_line: usize,
 }
 
-/// Whether the line has a comment with a character that GRBL obeys at once wherever it stands (`!`, `~`, `?` or one outside ASCII), as the G-code reader of the suite tells it.
+/// Whether the line has a comment with `!`, `~`, `?` or a control character, which GRBL obeys at once wherever it stands, as the G-code reader of the suite tells it. A
+/// character outside ASCII does not count: it does not go on in a comment (see [`clean_comments`]).
 fn holds_realtime_comment(line: &str) -> bool {
-    parse(line, Dialect::Grbl)
-        .diagnostics
-        .iter()
-        .any(|d| d.code == codes::REALTIME_CHARACTER)
+    line.chars()
+        .any(|c| matches!(c, '!' | '~' | '?') || (c.is_control() && c != '\t'))
+        && parse(line, Dialect::Grbl)
+            .diagnostics
+            .iter()
+            .any(|d| d.code == codes::REALTIME_CHARACTER)
+}
+
+/// The line with every character outside ASCII of its comments written as `_`: GRBL takes some bytes of such characters as commands wherever they stand, so a comment
+/// that goes on to the controller does not carry them. The code of the line is left as it is.
+fn clean_comments(line: &str) -> String {
+    let mut depth = 0usize;
+    let mut to_end = false;
+    line.chars()
+        .map(|c| {
+            match c {
+                ';' if depth == 0 => to_end = true,
+                '(' if !to_end => depth += 1,
+                ')' if !to_end && depth > 0 => depth -= 1,
+                _ => {}
+            }
+            if (to_end || depth > 0) && !c.is_ascii() {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// The warning for a program whose comments reach the controller with a character that GRBL obeys at once. `None` when there is none.
 pub fn realtime_warning(report: &Report) -> Option<String> {
     (report.realtime_lines > 0).then(|| {
         format!(
-            "{} lines have a comment with a character that GRBL obeys at once (!, ~, ? or one outside ASCII), the first is line {}: take it out before the program reaches a GRBL controller [{}]",
+            "{} lines have a comment with a character that GRBL obeys at once (!, ~, ? or a control character), the first is line {}: take it out before the program reaches a GRBL controller [{}]",
             report.realtime_lines,
             report.realtime_first_line,
             codes::REALTIME_CHARACTER
@@ -699,7 +724,7 @@ impl<'a> Leveller<'a> {
         // lines that are not moves and have no words to read: a `$` command of GRBL that only asks (`$G`), a parameter assignment (`#1=5`) and the text of a message (`M117 Hello`)
         if is_not_a_move(raw) {
             self.note_realtime(n, raw);
-            out.push_str(raw);
+            out.push_str(&clean_comments(raw));
             out.push('\n');
             return Ok(());
         }
@@ -807,7 +832,7 @@ impl<'a> Leveller<'a> {
             }
             self.mode = mode;
             self.note_realtime(n, raw);
-            out.push_str(raw);
+            out.push_str(&clean_comments(raw));
             out.push('\n');
             return Ok(());
         }
