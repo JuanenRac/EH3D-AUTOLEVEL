@@ -392,7 +392,7 @@ fn random_programs_with_arcs_are_cut_or_refused_without_a_panic() {
     let map = table(0.001, 0.002);
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
     let (mut cut, mut refused) = (0, 0);
-    for round in 0..600 {
+    for round in 0..1500 {
         let mut text = String::from("G0 X10 Y0 Z0\n");
         for _ in 0..1 + rng.below(8) {
             // a word twice and two motion codes on a line are refused, so a line here has one of each
