@@ -282,7 +282,7 @@ pub fn words(line: &str, number: usize) -> Result<Vec<(char, f64)>, String> {
     Ok(out)
 }
 
-/// Whether a line is one that is passed on as it is: `$` commands of GRBL, `#` parameter assignments and the message commands M117 and M118 with their text. Only the lines that move
+/// Whether a line is one that is passed on as it is: `$` commands of GRBL (the ones `refuse_hidden_commands` lets through), `#` parameter assignments and the message commands M117 and M118 with their text. Only the lines that move
 /// are held to the strict rules of the words; the strictness is about positions, not about every character a controller accepts.
 fn is_not_a_move(line: &str) -> bool {
     let t = line.trim_start();
@@ -295,6 +295,43 @@ fn is_not_a_move(line: &str) -> bool {
             .strip_prefix(m)
             .is_some_and(|rest| !rest.starts_with(|c: char| c.is_ascii_digit() || c == '.'))
     })
+}
+
+/// The `$` commands of GRBL that only ask: the help, the settings, the offsets, the state of the parser, the build and the startup lines. Every other one moves the machine
+/// (`$J=` jogs, `$H` homes) or changes how it behaves (`$X`, `$C`, `$100=...`, `$RST=`...).
+const GRBL_QUESTIONS: [&str; 6] = ["$", "$$", "$#", "$G", "$I", "$N"];
+
+/// Refuses what would reach the machine without having been read: a `$` command that is not a question, and a line with a carriage return in the middle, which a controller
+/// reads as two lines.
+fn refuse_hidden_commands(line: &str, n: usize) -> Result<(), String> {
+    let line = line.trim();
+    if line.contains('\r') {
+        return Err(format!(
+            "line {n}: a carriage return in the middle of the line: a controller would read what follows it as another line"
+        ));
+    }
+    if !line.starts_with('$') {
+        return Ok(());
+    }
+    // what GRBL reads of a line: no comments, no blanks, any case
+    let mut command = String::new();
+    let mut depth = 0;
+    for c in line.chars() {
+        match c {
+            ';' if depth == 0 => break,
+            '(' => depth += 1,
+            ')' if depth > 0 => depth -= 1,
+            _ if depth == 0 && !c.is_whitespace() => command.push(c.to_ascii_uppercase()),
+            _ => {}
+        }
+    }
+    if GRBL_QUESTIONS.contains(&command.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "line {n}: the command '{command}' of GRBL is refused: it can move the machine ($J= jogs, $H homes) or change it; only the ones that ask pass through ($, $$, $#, $G, $I, $N)"
+        ))
+    }
 }
 
 fn fmt(v: f64) -> String {
@@ -546,13 +583,14 @@ impl<'a> Leveller<'a> {
         let d = opts.decimals;
         let tilt = opts.a_compensation == AAxisCompensation::Tilt;
         let tilt_b = opts.b_compensation == AAxisCompensation::Tilt;
+        refuse_hidden_commands(raw, n)?;
         // the '%' that some postprocessors put at the start and at the end of the program is not a word
         if raw.trim() == "%" {
             out.push_str(raw);
             out.push('\n');
             return Ok(());
         }
-        // lines that are not moves and have no words to read: a system command of GRBL (`$H`), a parameter assignment (`#1=5`) and the text of a message (`M117 Hello`)
+        // lines that are not moves and have no words to read: a `$` command of GRBL that only asks (`$G`), a parameter assignment (`#1=5`) and the text of a message (`M117 Hello`)
         if is_not_a_move(raw) {
             out.push_str(raw);
             out.push('\n');

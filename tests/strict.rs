@@ -241,24 +241,24 @@ fn the_command_line_reports_a_bad_segment_a_bad_reference_and_a_missing_file() {
 }
 
 #[test]
-fn the_command_line_can_level_a_file_in_place_once_and_then_refuses_it() {
+fn the_command_line_never_levels_a_file_over_itself_and_never_levels_it_twice() {
     let map = tmp("inplace-map.txt");
     let prog = tmp("inplace.nc");
     code(&["demo-map", &map, "0", "0", "100", "100", "3", "3"]);
     std::fs::write(&prog, PROGRAM).unwrap();
     let (c, _, e) = code(&["apply", &map, &prog, &prog]);
+    assert_eq!(c, Some(1));
+    assert!(e.contains("also the program"), "{e}");
+    assert_eq!(std::fs::read_to_string(&prog).unwrap(), PROGRAM);
+    let out = tmp("inplace-out.nc");
+    let (c, _, e) = code(&["apply", &map, &prog, &out]);
     assert_eq!(c, Some(0), "{e}");
-    let first = std::fs::read_to_string(&prog).unwrap();
+    let first = std::fs::read_to_string(&out).unwrap();
     assert!(first.starts_with("; generator: eh3d-autolevel "), "{first}");
     assert!(first.contains("\n(eh3d-autolevel "), "{first}");
-    let (c, _, e) = code(&["apply", &map, &prog, &prog]);
+    let (c, _, e) = code(&["apply", &map, &out, &tmp("inplace-again.nc")]);
     assert_eq!(c, Some(1));
     assert!(e.contains("already levelled"), "{e}");
-    assert_eq!(
-        std::fs::read_to_string(&prog).unwrap(),
-        first,
-        "a refused run leaves the file as it was"
-    );
 }
 
 #[test]

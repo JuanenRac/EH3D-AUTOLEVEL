@@ -58,7 +58,7 @@ fn a_dry_run_needs_no_output_file_but_still_refuses_what_is_wrong() {
 }
 
 #[test]
-fn the_output_may_not_be_the_map_and_levelling_in_place_leaves_no_temporary_file() {
+fn the_output_may_not_be_the_map_or_the_program() {
     let (map, shared, _) = files("inplace");
     // a copy of its own: the tests of this file run together and share the others
     let prog = format!("{shared}.inplace.nc");
@@ -67,8 +67,10 @@ fn the_output_may_not_be_the_map_and_levelling_in_place_leaves_no_temporary_file
     let (ok, _, e) = run(&["apply", &map, &prog, &map]);
     assert!(!ok && e.contains("also the map"), "{e}");
     assert_eq!(std::fs::read_to_string(&map).unwrap(), before);
+    let program = std::fs::read_to_string(&prog).unwrap();
     let (ok, _, e) = run(&["apply", &map, &prog, &prog]);
-    assert!(ok, "{e}");
+    assert!(!ok && e.contains("also the program"), "{e}");
+    assert_eq!(std::fs::read_to_string(&prog).unwrap(), program);
     assert!(!Path::new(&format!("{prog}.tmp")).exists());
 }
 

@@ -483,6 +483,30 @@ fn the_settings_hold_the_limits_and_the_command_stops_with_the_code_2() {
     assert_eq!(run(&["stream", &map, "no-such-file.nc"]).0, Some(1));
 }
 
+#[test]
+fn the_stream_never_writes_over_what_it_reads_and_stops_at_a_jog() {
+    let path = |name: &str| format!("{}/stream-over-{name}", env!("CARGO_TARGET_TMPDIR"));
+    let (map, program, sent) = (path("map.txt"), path("job.nc"), path("sent.nc"));
+    assert_eq!(
+        run(&["demo-map", &map, "0", "0", "100", "100", "5", "5"]).0,
+        Some(0)
+    );
+    std::fs::write(&program, PROGRAM).unwrap();
+    let table = std::fs::read_to_string(&map).unwrap();
+    for (out, what) in [(&program, "also the program"), (&map, "also the map")] {
+        let (code, _, e) = run(&["stream", &map, &program, "--out", out]);
+        assert_eq!(code, Some(1), "{e}");
+        assert!(e.contains(what), "{e}");
+    }
+    assert_eq!(std::fs::read_to_string(&program).unwrap(), PROGRAM);
+    assert_eq!(std::fs::read_to_string(&map).unwrap(), table);
+    std::fs::write(&program, "G0 Z5\n$J=G91 X10 F500\n").unwrap();
+    let (code, _, e) = run(&["stream", &map, &program, "--out", &sent]);
+    assert_eq!(code, Some(2), "{e}");
+    assert!(e.contains("stopped: line 2:") && e.contains("$J="), "{e}");
+    assert!(!std::fs::read_to_string(&sent).unwrap().contains('$'));
+}
+
 /// The two lines a sender is given after a stop, for a program that stops, on `map` with the options `opts`.
 fn stopped_safe_lines(map: &HeightMap, opts: &Options, program: &str) -> Vec<String> {
     let mut machine = SimMachine::new(map, (0.0, 0.0), Method::Bilinear);
