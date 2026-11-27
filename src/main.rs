@@ -33,6 +33,7 @@ const HELP: &str = "eh3d-autolevel: corrects the Z of a G-code program with the 
 
 --to-server (apply, info --json and demo-map) keeps the corrected program, the JSON of info or the map on the EH3D server as an artifact, with the values of the run; it needs --config FILE with server_address and server_token and is refused before any work when they are missing (and with --dry-run, which writes nothing).
 --dry-run corrects and counts but writes nothing (OUT.nc may then be left out).
+The output of apply and of stream --out is never the program or the map that are read. A `$` command of GRBL passes through only when it asks ($, $$, $#, $G, $I, $N): a jog ($J=), the homing ($H) and every other one are refused with their line.
 --spike MM (0.1 by default, 0 to 10; 0 gives no check) shows, on the error output, a point of the map that reads more than MM above or below what its neighbours give (a probe that slipped, a chip under the tip): the program is written all the same. The key of the file is `spike-mm`. info lists the same points. --json prints the result of apply or of info as one JSON object, for other programs, instead of the sentence.
 --noise MM and --seed N of demo-map add to every point of the simulated table a reading error of up to MM (0 to 1; the same seed gives the same map) and --bad COL,ROW,MM adds MM to one point (COL and ROW from 1): a map to try the check of doubtful readings on.
 --decimals N writes X, Y and Z with N decimals (1 to 6, 3 by default); the same key is `decimals = N` in the file of --config, and the option wins over the file. The same goes for --max-lines (key `max-lines`).
@@ -63,6 +64,18 @@ fn same_file(a: &str, b: &str) -> bool {
         (Ok(x), Ok(y)) => x == y,
         _ => a == b,
     }
+}
+
+/// Refuses an output that is the map or the program that are read.
+fn never_over_an_input(out: &str, map: &str, program: &str) -> Result<(), String> {
+    for (input, what) in [(map, "map"), (program, "program")] {
+        if same_file(out, input) {
+            return Err(format!(
+                "{out}: the output file is also the {what}; write to another file"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// A reading error of the simulated table: up to `amplitude` mm either way, from a small generator (xorshift) that the same seed repeats.
@@ -184,6 +197,9 @@ fn stream_command(mut args: Vec<String>) -> Result<bool, String> {
         return Err("stream needs a map and an input program".into());
     }
     finish(&args, 2)?;
+    if let Some(path) = &out_path {
+        never_over_an_input(path, &args[0], &args[1])?;
+    }
     let map = load_map(&args[0])?;
     let text = read_text(&args[1])?;
     let mut machine = SimMachine::new(&map, opts.reference, opts.method);
@@ -330,12 +346,9 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 });
             }
             finish(&args, 3)?;
-            // the output may be the program (levelling in place: the mark refuses a second run) but never the map
-            if !dry_run && same_file(&args[2], &args[0]) {
-                return Err(format!(
-                    "{}: the output file is also the map; write the corrected program to another file",
-                    args[2]
-                ));
+            // what is read is never written over
+            if !dry_run {
+                never_over_an_input(&args[2], &args[0], &args[1])?;
             }
             let map = load_map(&args[0])?;
             let text = read_text(&args[1])?;
@@ -372,7 +385,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
                 }
                 return Ok(());
             }
-            // written beside and renamed, so that a program levelled in place is never left half written
+            // written beside and renamed, so that the output is never left half written
             let corrected = mark_with_header(
                 &out,
                 &map,

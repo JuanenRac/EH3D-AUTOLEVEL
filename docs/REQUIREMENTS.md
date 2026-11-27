@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine.
 
-The register has 54 requirements: 46 implemented, 6 prototype, 2 planned and 0 validated. By progress: 46 done, 6 partial, 0 pending and 2 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 56 requirements: 48 implemented, 6 prototype, 2 planned and 0 validated. By progress: 48 done, 6 partial, 0 pending and 2 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -103,3 +103,10 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | ALVL-052 | An arc is modal like the other moves, and a straight move ends it. | implemented | done | host-test | `arcs::an_arc_is_modal_and_a_straight_move_ends_it` | - |
 | ALVL-053 | A piece of an arc is never longer than the segment of the settings either. | implemented | done | host-test | `arcs::a_piece_is_never_longer_than_the_segment_either` | - |
 | ALVL-054 | The place read through a cable that cuts the answers and adds noise is the right one or none. | implemented | done | simulator | `start_pos::the_place_is_never_wrong_on_a_cable_that_cuts_and_adds_noise` | Seeded cable of the simulated GRBL. |
+
+## What reaches the machine and the files that are read
+
+| ID | Requirement | State | Progress | Evidence | Test | Limits |
+|---|---|---|---|---|---|---|
+| ALVL-055 | A `$` command of GRBL that can move or change the machine is refused with its line, and only the ones that ask pass through. | implemented | done | host-test | `more::a_command_of_grbl_that_can_move_the_machine_is_refused_and_one_that_asks_passes` | Checked against the commands of GRBL on a computer; the commands of other controllers that do not start with `$` are not looked at. |
+| ALVL-056 | The output of apply and of stream is never the program or the map that are read. | implemented | done | host-test | `streaming::the_stream_never_writes_over_what_it_reads_and_stops_at_a_jog` | - |

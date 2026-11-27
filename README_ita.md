@@ -17,7 +17,7 @@
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 293 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
+**Verifica di onestà - cosa funziona oggi:** una libreria Rust e un programma a riga di comando (`eh3d-autolevel`) con 296 test eseguiti su un computer: corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie. Ha una finestra (compilata con `--features gui`) che apre un programma G-code e una mappa delle altezze, mostra il piano come maglia colorata con i percorsi livellati sopra ed esporta, ma la finestra non è ancora stata vista su uno schermo; non è stato provato su una macchina e non è stato verificato su una raccolta di file reali.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.1.3` |
 | Maturità | Funzionale |
-| Test | 293 |
+| Test | 296 |
 | Stack tecnologico | Rust |
 | Su hardware reale | Non provato: nulla di questo ha girato su una macchina |
 
@@ -46,7 +46,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 |---|---|---|
 | Nucleo | 🟡 | corregge la Z di un programma G-code con la mappa delle altezze del piano, spezzando i movimenti in tratti che seguono la superficie; provato su un computer con input normali e danneggiati, non con una raccolta di file reali. |
 | Riga di comando | 🟡 | `eh3d-autolevel` esegue le stesse funzioni della libreria e stampa il risultato; ogni errore torna come messaggio e codice di uscita diverso da zero. |
-| Test | 🟡 | 293 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. Includono una simulazione a seme fisso di una sessione di tastatura con i guasti del nodo tastatore, con guasti iniettati e ripristino. |
+| Test | 🟡 | 296 test passano (`cargo test`), con casi normali, casi limite e input danneggiati. Includono una simulazione a seme fisso di una sessione di tastatura con i guasti del nodo tastatore, con guasti iniettati e ripristino. |
 | Sicurezza | 🟡 | Rust sicuro e semplice (`forbid(unsafe_code)`): nulla va in panico con i file ricevuti e un valore errato è un errore con il suo motivo; nessuna revisione indipendente. |
 | Finestra | 🟠 | Scritta (egui, `--features gui`): aprire o trascinare un programma e una mappa delle altezze, simulare un piano, vedere il piano come maglia colorata e i percorsi livellati, zoom e spostamento, regolare il livellamento, esportare; la sua logica è testata, ma non è ancora stata compilata né vista su uno schermo. |
 | Hardware reale | 🔴 | Non provato: nulla di questo è stato eseguito su una macchina. |
@@ -89,7 +89,7 @@ Come si incastrano le parti di questo repository: chi lo usa, cosa contiene e da
 * **Test con input danneggiati:** i test forniscono anche file vuoti, spazzatura, numeri enormi e file tagliati, e nessuno può andare in panico.
 * **Nessuna ipotesi:** un valore privo di senso è un errore che dice quale e perché, mai un risultato che sembra solo giusto.
 * **Nessun codice unsafe:** `#![forbid(unsafe_code)]` nella libreria e nel programma.
-* **Le righe che non sono movimenti passano così come sono:** i comandi `$`, le assegnazioni `#` e i messaggi `M117` e `M118` sono scritti com'erano, il checksum di una riga numerata non è una parola, le parole di mandrino e refrigerante (`M3`-`M9`) di un movimento suddiviso vanno con il primo pezzo e quelle di fine (`M0`, `M1`, `M2`, `M30`) con l'ultimo, `--max-lines` (5000000 per impostazione predefinita) rifiuta un programma con più righe di uscita.
+* **Le righe che non sono movimenti passano così come sono:** i comandi `$`, le assegnazioni `#` e i messaggi `M117` e `M118` sono scritti com'erano, il checksum di una riga numerata non è una parola, le parole di mandrino e refrigerante (`M3`-`M9`) di un movimento suddiviso vanno con il primo pezzo e quelle di fine (`M0`, `M1`, `M2`, `M30`) con l'ultimo, `--max-lines` (5000000 per impostazione predefinita) rifiuta un programma con più righe di uscita. Un movimento manuale (`$J=`), la ricerca dello zero macchina (`$H`) e ogni altro comando `$` che non sia di sola interrogazione (`$`, `$$`, `$#`, `$G`, `$I`, `$N`) vengono rifiutati con la loro riga, come una riga con un ritorno a capo nel mezzo; l'uscita di `apply` e di `stream --out` non è mai il programma né la mappa che vengono letti.
 * **Gli assi rotanti A, B e C sono interpolati:** quando un movimento di taglio è diviso in pezzi, le sue parole `A`, `B` e `C` vanno in linea retta dal valore che avevano a quello del movimento (sono modali e partono da 0), con gli stessi decimali di X, Y e Z; l'ultimo pezzo finisce esattamente sulla destinazione e la Z del piano viene ancora solo da X e Y. Un programma senza parole rotanti è scritto come prima.
 * **Compensazione di Z per la rotazione dell'asse A:** con `a-axis-compensation = tilt` e `a-axis-radius-mm = r` (o `--a-compensation tilt --a-radius r`), allo Z di ogni movimento scritto si aggiunge `r * (1 - cos A)` dopo l'altezza del piano, con A in gradi come la lascia il movimento (interpolata pezzo per pezzo); il valore predefinito è `off`, che non cambia alcuna uscita, e un avviso sull'uscita degli errori dice quando è stata applicata. La formula è in `docs/a-axis-compensation.md`.
 * **Gli assi B e C:** l'asse B (una rotazione attorno a Y) ha la stessa compensazione con il proprio raggio (`b-axis-compensation = tilt` e `b-axis-radius-mm` nel file, `--b-compensation` e `--b-radius`) e le due si sommano; l'asse C ruota attorno a Z, non cambia nessuna altezza e non ne ha bisogno (le sue parole sono riportate e interpolate come quelle di A e B). Una macchina simulata percorre il programma livellato e verifica la profondità sotto il piano; nulla è stato eseguito su una macchina con assi rotanti. **Un movimento che omette un asse:** per impostazione predefinita si suppone che il programma parta da 0 su ogni asse; `unknown-axis = refuse` (`--unknown-axis refuse`) rifiuta, con il numero della riga, un movimento che omette X, Y o Z prima che il programma l'abbia impostato.
@@ -144,7 +144,7 @@ Per fare un'immagine della finestra senza aprirla a mano, eseguila con `--shot F
 
 ## 🧪 Test
 
-La suite ha 293 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
+La suite ha 296 test (`cargo test`, eseguiti su Windows e Linux nella CI). Verificano i casi normali, i casi limite e gli input danneggiati: file vuoti, spazzatura e file tagliati non causano mai un panico. La CI esegue anche `cargo fmt --check`, `cargo clippy` con gli avvisi come errori e `python -I tools/ci_validate.py`.
 
 ## 🏗️ Compilazione e rilascio
 

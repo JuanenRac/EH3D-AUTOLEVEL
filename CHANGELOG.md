@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A jog in a program is refused (fix):** a line that starts with `$` was passed through whatever it said, so a jog (`$J=`) or a homing (`$H`) reached the machine without being read. Only the commands that ask pass now (`$`, `$$`, `$#`, `$G`, `$I`, `$N`); every other one is refused with its line, also by `stream`. A line with a carriage return in the middle, which a controller reads as two, is refused too.
+- **The program that is read is never written over (fix):** `apply OUT.nc` and `stream --out` refuse an output that is the input program or the map, and so does the export of the window. Levelling a file in place is not possible any more: write to another file. Three new tests.
+
 ## [0.1.3] - Safer stop of a stream, stricter lines and atomic output
 
 - **The lift after a stopped stream could take the tool down (fix):** the two lines given after a stop were worked out from the line that had just been refused, so a tool standing at Z50 could be sent down to Z5, and a map with a bad reading could send it deep into the table or far up. They now come from the last line that was given out, or from the start position when nothing moved yet.

@@ -157,11 +157,67 @@ fn the_percent_lines_of_a_postprocessor_are_kept_and_the_levelling_does_not_chan
 }
 
 #[test]
+fn a_command_of_grbl_that_can_move_the_machine_is_refused_and_one_that_asks_passes() {
+    let map = plane(0.001, 0.0);
+    let o = Options::default();
+    for line in [
+        "$J=G91 X10 F500",
+        "$j=g91x10f500",
+        "  $ J = G91 X10 F500",
+        "$J(jog)=G91X10F500",
+        "$H",
+        "$HX",
+        "$X",
+        "$C",
+        "$SLP",
+        "$RST=*",
+        "$100=250",
+        "$N0=G0 X10",
+        "$I=name",
+        "$G$H",
+    ] {
+        let program = format!("G0 X0 Y0\n{line}\n");
+        let e = correct(&program, &map, &o).unwrap_err();
+        assert!(
+            e.starts_with("line 2") && e.contains("refused"),
+            "{line}: {e}"
+        );
+    }
+    for line in [
+        "$",
+        "$$",
+        "$#",
+        "$G",
+        "$I",
+        "$N",
+        " $g ; what is on",
+        "$# (offsets)",
+    ] {
+        let program = format!("G0 X0 Y0\n{line}\n");
+        let (out, _) = correct(&program, &map, &o).unwrap();
+        assert!(out.lines().any(|l| l == line), "{line}: {out}");
+    }
+    // a carriage return in the middle of a line would hand the controller a second line
+    for line in [
+        "$G ;\r$J=G91 X10 F500",
+        "M117 hello\r$H",
+        "#1=5\rG0 X10",
+        "G1 X1 (a\r$H)",
+    ] {
+        let program = format!("G0 X0 Y0\n{line}\n");
+        let e = correct(&program, &map, &o).unwrap_err();
+        assert!(e.contains("carriage return"), "{line:?}: {e}");
+    }
+    // the endings of Windows are not in the middle of a line
+    assert!(correct("G0 X0 Y0\r\n$G\r\n", &map, &o).is_ok());
+}
+
+#[test]
 fn lines_that_are_not_moves_pass_through_and_a_checksum_is_not_a_word() {
     let program =
-        "$H\n#1=5\nM117 Hello world\nM118 text 1\nG21 G90\nG0 X0 Y0\nN10 G1 X10 Y0 F100*45\nM2\n";
+        "$G\n#1=5\nM117 Hello world\nM118 text 1\nG21 G90\nG0 X0 Y0\nN10 G1 X10 Y0 F100*45\nM2\n";
     let (out, _) = correct(program, &plane(0.001, 0.0), &Options::default()).unwrap();
-    for kept in ["$H", "#1=5", "M117 Hello world", "M118 text 1", "M2"] {
+    for kept in ["$G", "#1=5", "M117 Hello world", "M118 text 1", "M2"] {
         assert!(out.lines().any(|l| l == kept), "{kept}: {out}");
     }
     assert!(

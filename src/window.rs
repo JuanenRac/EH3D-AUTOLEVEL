@@ -729,7 +729,11 @@ impl Window {
             self.status = Status::NeedMap;
             return false;
         };
-        if file.path.as_deref().is_some_and(|m| same_file(m, path)) {
+        let over_the_program = self
+            .program
+            .as_ref()
+            .is_some_and(|p| same_file(&p.path, path));
+        if over_the_program || file.path.as_deref().is_some_and(|m| same_file(m, path)) {
             self.status = Status::SameFile(path.display().to_string());
             return false;
         }
@@ -1181,6 +1185,14 @@ mod tests {
         assert!(matches!(w.status, Status::SameFile(_)));
         let kept = fs::read_to_string(&map_path).unwrap();
         assert!(kept.starts_with("levelling 1"));
+    }
+
+    #[test]
+    fn the_levelled_program_is_never_written_over_the_program_it_comes_from() {
+        let (s, mut w) = ready("overinput");
+        assert!(!w.export_program(&s.0.join("job.nc")));
+        assert!(matches!(w.status, Status::SameFile(_)));
+        assert_eq!(fs::read_to_string(s.0.join("job.nc")).unwrap(), PROGRAM);
     }
 
     #[test]
