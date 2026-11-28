@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.5] - G80 with a move is refused and accents never reach the controller (not tried on a machine)
+
 - **`G80` and a move on the same line are refused (safety, changes what is accepted):** `G80 G0 Z5` and `G0 G80 Z5` are two codes of one group, which a controller refuses and the shared G-code reader tells as `word-repeated`; they were taken as a move. Write `G80` on a line of its own.
 - **Third-party notices in every package (`docs/THIRD_PARTY_NOTICES`):** the packages of the releases now carry the copyright notices and licence texts of the Rust crates and of the data the program is built with, and the CI fails when a new dependency or licence is not in the file.
 
